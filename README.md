@@ -25,9 +25,33 @@ import {
   Router,              // express-promise-router
   initHDSModel,        // HDS data model init (re-exported from hds-lib)
   getHDSModel,         // HDS data model access (re-exported from hds-lib)
+  ensureAppStreamsTree,// Provision a {appId}-app/ subtree on a user account (Plan 25 / Plan 45 §9)
   testServer           // Test helpers (init, apiTest, createOnboardedUser, etc.)
 } from 'lib-bridge-js';
 ```
+
+### App-stream subtree (`ensureAppStreamsTree`)
+
+Bridges should publish their app-specific content (notes, messaging, …) under a stable `{appId}-app/` subtree per the Plan-25 convention. Use the helper rather than rolling your own `streams.create` boilerplate:
+
+```typescript
+import { ensureAppStreamsTree } from 'lib-bridge-js';
+
+const { appStreamId, subStreamIds } = await ensureAppStreamsTree(hdsConnection, {
+  appId: 'my-bridge',
+  baseName: 'My Bridge App',
+  parentId: 'my-bridge',                            // optional: child of an existing base
+  subStreams: [
+    { suffix: 'notes', name: 'Notes' },             // → my-bridge-app-notes
+    { suffix: 'chat',  name: 'Chat',                // → my-bridge-app-chat
+      clientData: { hdsCustomField: { /* … */ } }   // optional clientData per substream
+    }
+  ]
+});
+// Use appStreamId on the bridge access via appTemplates.ensureBridgeAccess({ clientData: { appStreamId } })
+```
+
+Idempotent (tolerates `item-already-exists`).
 
 ## Creating a bridge
 
