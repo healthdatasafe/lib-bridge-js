@@ -45,17 +45,21 @@ async function init (): Promise<void> {
   const config = await getConfig();
   const bridgeApiEndPoint = config.get<string>('bridgeApiEndPoint');
   _bridgeConnection = new Connection(bridgeApiEndPoint);
-  // check that access is valid
-  const info = await _bridgeConnection.accessInfo();
-  if (info?.permissions[0]?.streamId !== settings.mainStreamId &&
-      info?.permissions[0]?.level !== 'manage'
-  ) {
-    internalError(`Bridge does not have "manage" permissions on stream ${settings.mainStreamId}`, info);
-  }
   settings.mainStreamId = config.get<string>('service:bridgeAccountMainStreamId');
   settings.userParentStreamId = settings.mainStreamId + PARENT_USER_STREAM_SUFFIX;
   settings.activeUsersStreamId = settings.userParentStreamId + '-active';
   settings.errorStreamId = settings.mainStreamId + '-errors';
+  // check that access has "manage" on the bridge's main stream — Pryv may
+  // inject other permissions (e.g. ":_system:account") at arbitrary indices,
+  // so search the list rather than relying on permissions[0].
+  const info = await _bridgeConnection.accessInfo();
+  const hasManage = info?.permissions?.some(
+    (p: { streamId?: string, level?: string }) =>
+      p.streamId === settings.mainStreamId && p.level === 'manage'
+  );
+  if (!hasManage) {
+    internalError(`Bridge does not have "manage" permissions on stream ${settings.mainStreamId}`, info);
+  }
   await ensureBaseStreams();
 }
 

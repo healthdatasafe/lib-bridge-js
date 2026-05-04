@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-05-04
+
+### Fixed — `bridgeAccount.init()` permission check robust against extra Pryv permissions
+
+Bridges entered a crash loop after the dev Pryv (`demo.datasafe.dev`) started returning `:_system:account` (level `none`) as the first entry in `accessInfo().permissions`, pushing the real `{ streamId: 'bridge', level: 'manage' }` entry to index 1. The previous check looked at `permissions[0]` only and also read `settings.mainStreamId` before it had been assigned (so the comparison was effectively against `null`, and the error message read `… on stream null`).
+
+- `src/lib/bridgeAccount.ts`: assign `settings.mainStreamId` (and derived stream IDs) **before** the access check, then verify by searching the full `permissions` array for an entry matching `mainStreamId` with `level === 'manage'` instead of relying on index `0`.
+
+No API change. Bumps patch.
+
 ## [0.6.0] - 2026-04-28
 
 ### Added — `ensureAppStreamsTree` helper (Plan 25 / Plan 45 Phase 9)
