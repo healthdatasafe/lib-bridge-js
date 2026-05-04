@@ -106,8 +106,9 @@ export async function ensureAppStreamsTree (
     const r = results[i];
     if (r?.stream?.id) continue;
     if (r?.error?.id === 'item-already-exists') continue;
+    const failedId = apiCalls[i]?.params?.id ?? 'unknown';
     throw new Error(
-      `ensureAppStreamsTree: failed to create stream "${apiCalls[i].params.id}" — ${r?.error?.id ?? 'unknown error'}`
+      `ensureAppStreamsTree: failed to create stream "${failedId}" — ${r?.error?.id ?? 'unknown error'}`
     );
   }
 
