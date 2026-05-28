@@ -28,7 +28,7 @@ export interface AppStreamSubstream {
   suffix: string;
   /** Display name for the substream. */
   name: string;
-  /** Optional `clientData` block carried onto the substream (e.g. `hdsCustomField`, `hdsSystemFeature`). */
+  /** Optional `clientData` block carried onto the substream (e.g. `hdsCustomField`). */
   clientData?: Record<string, unknown>;
 }
 
