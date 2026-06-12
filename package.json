@@ -30,7 +30,7 @@
   "license": "BSD-3-Clause",
   "dependencies": {
     "@pryv/boiler": "^1.2.6",
-    "backloop.dev": "^2.0.6",
+    "backloop.dev": "^3.0.3",
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "express-promise-router": "^4.1.1",

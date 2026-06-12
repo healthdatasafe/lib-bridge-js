@@ -6,8 +6,6 @@ import express from 'express';
 import type { Application } from 'express';
 import cors from 'cors';
 
-const pkg = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf-8'));
-
 import { init as pryvServiceInit } from './lib/pryvService.ts';
 import { init as bridgeAccountInit } from './lib/bridgeAccount.ts';
 import { init as onboardInit } from './methods/onboard.ts';
@@ -18,6 +16,8 @@ import userRouter from './routes/userRoute.ts';
 import { expressErrorHandler } from './errors/index.ts';
 import loggerMiddleware from './middlewares/logger.ts';
 import type PluginBridge from './lib/PluginBridge.ts';
+
+const pkg = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf-8'));
 
 const { getLogger, getConfig } = boiler;
 let _logger: ReturnType<typeof getLogger> | null = null;
