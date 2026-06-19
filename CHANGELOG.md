@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-06-19
+
+### Changed
+- Dependency refresh: re-pinned `hds-lib` to 1.2.1, carrying the pryv ecosystem bump to 3.7.1 (matches the open-pryv.io 2.0.0-rc.4 prod cores — Plan 78). No API changes.
+
 ## [0.6.1] - 2026-05-04
 
 ### Fixed — `bridgeAccount.init()` permission check robust against extra Pryv permissions

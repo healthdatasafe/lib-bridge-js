@@ -1,6 +1,6 @@
 {
   "name": "lib-bridge-js",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Bridge framework library for HDS partner integrations",
   "type": "module",
   "main": "dist/src/index.js",
