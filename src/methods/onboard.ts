@@ -114,7 +114,8 @@ async function initiate (partnerUserId: string, redirectURLs: RedirectURLs, webh
   const result = {
     type: 'authRequest',
     onboardingSecret,
-    redirectUserURL: (responseBody as any).url,
+    // open-pryv.io 2.x renamed this field: POST /reg/access returns `authUrl`.
+    redirectUserURL: (responseBody as any).authUrl,
     context: initiateResult
   };
 

@@ -34,7 +34,9 @@ describe('[PLTX] SampleBridge test', () => {
     assert.ok(event);
     assert.equal(event.type, 'note/txt');
     assert.equal(event.content, 'Hello world');
-    assert.equal(event.streamId, mainStreamId);
+    // Pryv events carry `streamIds` (plural); the deprecated singular is no
+    // longer echoed by open-pryv.io 2.x.
+    assert.ok(event.streamIds.includes(mainStreamId));
 
     // -- Wait for status to be updated
     await new Promise((resolve) => setTimeout(resolve, 500));

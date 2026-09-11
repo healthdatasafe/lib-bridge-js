@@ -2,6 +2,36 @@
 
 ## [Unreleased]
 
+## [0.8.7] - 2026-09-11
+
+### Fixed
+
+- **Onboarding handed the user a `redirectUserURL` of `undefined` against open-pryv.io 2.x.**
+  `POST /reg/access` was slimmed in the v2 refactor to the calling-app surface
+  (`status`, `key`, `authUrl`, `poll`, `poll_rate_ms`); the field carrying the sign-in URL is
+  now `authUrl`, and the request echo the response used to carry (`code`, `returnURL`,
+  `requestedPermissions`, `requestingAppId`, `clientData`) is gone. `onboard.ts` still read
+  `responseBody.url`, so every onboarding start returned `redirectUserURL: undefined` and the
+  partner backend had nowhere to send the user. Only `url` was affected: the other field the
+  flow depends on, `poll`, is unchanged in v2.
+
+### Changed
+
+- **Dependency advisories cleared by a lockfile refresh** (`npm audit fix`, no `--force`):
+  13 down to 3. `package.json` is untouched. What remains is dev-only (`mocha` and, through it,
+  `serialize-javascript`, both needing the `mocha@12` semver-major) plus `qs`, which
+  `express@4.22.1` pins to exactly `6.14.2` while the advisories only clear at `6.16.0` —
+  npm reports it in-range but cannot lift it, so it needs an `overrides` entry or express 5.
+
+### Tests
+
+- Brought the integration suite onto the v2 reg API: values the bridge sent are asserted from
+  config rather than from the response echo, the access-state update sends `apiEndpoint`
+  (it had been `apiEndPoint`, which the pre-v2 server tolerated), and event assertions read
+  `streamIds` rather than the deprecated singular `streamId`. 38 passing, previously 34 with
+  4 failing.
+
+
 ## [0.8.6] - 2026-09-07
 
 ### Changed
