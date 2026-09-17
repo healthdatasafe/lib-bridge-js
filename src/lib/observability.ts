@@ -1,4 +1,4 @@
-import boiler from '@pryv/boiler';
+import boiler from 'dev-boiler';
 import os from 'os';
 import type { Application, Request, Response, NextFunction, RequestHandler } from 'express';
 import {

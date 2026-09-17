@@ -1,4 +1,4 @@
-import boiler from '@pryv/boiler';
+import boiler from 'dev-boiler';
 import type { Request, Response, NextFunction } from 'express';
 
 const { getConfig } = boiler;

@@ -1,4 +1,4 @@
-import boiler from '@pryv/boiler';
+import boiler from 'dev-boiler';
 import http from 'http';
 import querystring from 'node:querystring';
 

@@ -1,4 +1,4 @@
-import boiler from '@pryv/boiler';
+import boiler from 'dev-boiler';
 import path from 'path';
 import fs from 'fs';
 import { createRequire } from 'module';

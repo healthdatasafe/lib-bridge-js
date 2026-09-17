@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { init as initTestServer, apiTest, partnerAuth, createOnboardedUser, bridgeIsConfigured } from './helpers/testServer.ts';
 import ShortUniqueId from 'short-unique-id';
-import boiler from '@pryv/boiler';
+import boiler from 'dev-boiler';
 const { getConfig } = boiler;
 
 describe('[USEX] Users', function () {

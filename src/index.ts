@@ -22,7 +22,7 @@ export { requiredPermissionsAndStreams } from './lib/plugins.ts';
 export { init as initPryvService, createuser as createPryvUser } from './lib/pryvService.ts';
 export { addCredentialToBridgeAccount } from './methods/user.ts';
 
-// Logger (re-exported from @pryv/boiler to avoid duplicate singleton issues)
+// Logger (re-exported from dev-boiler to avoid duplicate singleton issues)
 export { getLogger } from './lib/PluginBridge.ts';
 
 // Shared cache (cluster-safe via memored)

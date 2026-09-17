@@ -1,4 +1,4 @@
-import boiler from '@pryv/boiler';
+import boiler from 'dev-boiler';
 import { bridgeConnection, streamIdForUserId, getUserParentStreamId, logErrorOnBridgeAccount } from '../lib/bridgeAccount.ts';
 import * as pryvService from '../lib/pryvService.ts';
 import { internalError, badRequest, serviceError } from '../errors/index.ts';

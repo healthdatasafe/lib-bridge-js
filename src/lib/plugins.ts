@@ -1,4 +1,4 @@
-import boiler from '@pryv/boiler';
+import boiler from 'dev-boiler';
 import { initHDSModel, getHDSModel } from 'hds-lib';
 import { bridgeConnection } from './bridgeAccount.ts';
 import type PluginBridge from './PluginBridge.ts';

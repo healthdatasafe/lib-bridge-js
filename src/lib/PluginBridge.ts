@@ -1,5 +1,5 @@
-import boiler from '@pryv/boiler';
-import type { Config, Logger } from '@pryv/boiler';
+import boiler from 'dev-boiler';
+import type { Config, Logger } from 'dev-boiler';
 import type { Application } from 'express';
 import * as errors from '../errors/index.ts';
 import * as user from '../methods/user.ts';

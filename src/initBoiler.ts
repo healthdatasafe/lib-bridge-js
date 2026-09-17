@@ -5,7 +5,7 @@
  */
 import path from 'path';
 import { createRequire } from 'module';
-import type { Boiler, Config, ExtraConfig } from '@pryv/boiler';
+import type { Boiler, Config, ExtraConfig } from 'dev-boiler';
 
 const require = createRequire(import.meta.url);
 
@@ -31,7 +31,7 @@ export default function initBoiler (appName: string, consumerConfigDir?: string)
   // Use consumer's config dir if provided, with lib-bridge-js defaults as fallback
   const configDir = consumerConfigDir || bridgeConfigDir;
   const baseFilesDir = consumerConfigDir ? path.resolve(consumerConfigDir, '..') : path.resolve(import.meta.dirname, '..');
-  const boiler = require('@pryv/boiler').init({
+  const boiler = require('dev-boiler').init({
     appName,
     baseFilesDir,
     baseConfigDir: configDir,

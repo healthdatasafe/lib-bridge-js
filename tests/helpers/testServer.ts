@@ -8,7 +8,7 @@ import { pryv, initHDSModel } from 'hds-lib';
 import * as user from '../../src/methods/user.ts';
 import { requiredPermissionsAndStreams } from '../../src/lib/plugins.ts';
 import type { Application } from 'express';
-import type { Config } from '@pryv/boiler';
+import type { Config } from 'dev-boiler';
 import type PluginBridge from '../../src/lib/PluginBridge.ts';
 import SampleBridge from '../sample-bridge/index.ts';
 

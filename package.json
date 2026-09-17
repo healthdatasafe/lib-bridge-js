@@ -29,7 +29,7 @@
   "author": "Health Data Safe",
   "license": "BSD-3-Clause",
   "dependencies": {
-    "@pryv/boiler": "github:healthdatasafe/dev-boiler",
+    "dev-boiler": "github:healthdatasafe/dev-boiler",
     "backloop.dev": "git+https://github.com/perki/backloop.dev-node.git#v5.2.1",
     "cors": "^2.8.5",
     "express": "^4.19.2",
