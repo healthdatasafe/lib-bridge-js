@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-18
+
+### Changed
+
+- **`hds-lib` 1.3.4 to 2.5.0.** The dependency is declared as a floating git URL, so the
+  committed lockfile was the only thing pinning it, and it had been frozen on a 1.3.4 SHA while
+  hds-lib moved a full major version ahead. Every consumer of this package inherited that pin, so
+  the four bridges and datasets-service were all resolving a 1.x hds-lib (and with it a stale
+  `@pryv/*` 3.10.0 tree) long after the apps had moved to 2.x. The bump also brings `pryv` to
+  3.12.0 and `@pryv/cmc` to 3.16.1 here.
+
+  **The 2.0.0 breaking change does not reach this package.** It narrowed
+  `HDSItemDef.eventTemplate()` to refuse guessing which declared variation the caller meant;
+  lib-bridge-js has no `eventTemplate` call site. The four symbols it does import from hds-lib
+  (`pryv`, `initHDSModel`, `getHDSModel`, `HDSService`) are all still exported unchanged at 2.5.0.
+
+  Gate: `tsc --noEmit` clean, `eslint` clean, 26 passing / 12 pending, identical to the 1.3.4
+  baseline. The resolved SHA is `e87afd31`, the tip of hds-lib-js `main`.
+
+  **Consumers are not affected until they update.** They pin this package by SHA, so the four
+  bridges and datasets-service keep their current tree until each runs `npm update lib-bridge-js`
+  with its own test pass.
+
+
 ## [0.8.7] - 2026-09-11
 
 ### Fixed
