@@ -29,9 +29,9 @@
   "author": "Health Data Safe",
   "license": "BSD-3-Clause",
   "dependencies": {
-    "dev-boiler": "github:healthdatasafe/dev-boiler",
     "backloop.dev": "git+https://github.com/perki/backloop.dev-node.git#v5.2.1",
     "cors": "^2.8.5",
+    "dev-boiler": "github:healthdatasafe/dev-boiler",
     "express": "^4.19.2",
     "express-promise-router": "^4.1.1",
     "hds-lib": "github:healthdatasafe/hds-lib-js",
