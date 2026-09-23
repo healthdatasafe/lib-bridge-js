@@ -2,6 +2,41 @@
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-09-23
+
+### Fixed
+
+- **SECURITY: partner auth failed open — an anonymous request authenticated as the partner.**
+  `checkIfPartner` compared `req.headers.authorization === partnerAuthToken` directly. When
+  `partnerAuthToken` was not configured, `config.get()` returned `undefined`, and an
+  unauthenticated request's `authorization` header is `undefined` too — so `undefined ===
+  undefined` marked every ANONYMOUS caller as the partner. **Sending no credentials
+  authenticated you; sending wrong ones did not.**
+
+  This was live: neither deployed bridge had `partnerAuthToken` configured. Confirmed against
+  production on 2026-09-23 — no `Authorization` header returned **200**, a bogus header returned
+  401. It exposed every partner-only route, not just the one fixed in 0.9.1:
+  `POST /user/onboard/`, `GET /user/:id/status`, **`POST /user/:id/status` (activate/deactivate
+  any user)**, `GET /user/list/apiEndPoints`, and `GET /account/errors/`.
+
+  This is the root cause; 0.9.1's missing `assertFromPartner` was a second, independent hole in
+  the same route. 0.9.1 alone did not close the exposure.
+
+  The comparison now lives in a pure, exported `matchesPartnerToken(header, token)` requiring
+  **both** sides to be non-empty strings, and `init()` normalizes an absent or empty token to
+  `null` and logs an error — loudly, because the consequence is otherwise invisible: with no
+  token, every partner route correctly rejects everyone, which is the safe direction but will
+  look like a bug to whoever needs those routes.
+
+  Extracting the predicate was necessary to test it honestly: `config/test-config.yml` defines
+  `partnerAuthToken`, so no config-driven test can reach the `undefined` state that caused this.
+  A first attempt at a middleware-level test passed against the vulnerable code — it left the
+  token at its `null` initial value, and `undefined === null` is false, so it never reproduced
+  the bug. Verified by reverting: `[CKAN]` and `[CKAE]` fail without the fix, 37 pass with it.
+
+  **Consumers must `npm update lib-bridge-js` and redeploy.**
+
+
 ## [0.9.1] - 2026-09-23
 
 ### Fixed
