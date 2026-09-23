@@ -2,6 +2,33 @@
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-09-23
+
+### Fixed
+
+- **SECURITY: `GET /user/list/apiEndPoints` was unauthenticated.** The route was missing the
+  `errors.assertFromPartner(req)` call its four sibling routes in `src/routes/userRoute.ts` all
+  carry, so any caller able to reach a bridge could read it. The response streams every
+  `credentials/pryv-api-endpoint` event on the bridge account, and a Pryv apiEndpoint embeds its
+  auth token, so the exposure was every onboarded user's credentials rather than only metadata.
+
+  `checkAuth.checkIfPartner` is app-level middleware that only *sets* `req.isPartner`; enforcing
+  it is each route's own job, which is why one route missing the assertion was silently open. The
+  router is mounted unconditionally at `/user` in `src/server.ts`, so this was live on every
+  bridge built on this package.
+
+  **No consumer in the workspace calls the route** (grep across `apps/`, `bridges/`, `libs/`,
+  `services/`, `infra/`, `_local/`), so the change to 401 breaks nothing; the exposure was purely
+  incidental.
+
+  New `tests/userRouteAuth.test.ts` mounts the router on a bare Express app with the same
+  middleware chain rather than going through `getApp()`. That is deliberate: `getApp()`
+  initializes the bridge account against a live `bridgeApiEndPoint`, so the whole integration
+  suite skips on a machine without one — and a security regression must not be invisible there.
+  Verified by reverting the fix: `[USAN]` and `[USAB]` fail without it, all 31 pass with it.
+
+  **Consumers must `npm update lib-bridge-js` and redeploy** to pick this up — they pin by SHA.
+
 ## [0.9.0] - 2026-09-18
 
 ### Changed

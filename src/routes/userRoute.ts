@@ -72,8 +72,15 @@ router.post('/:partnerUserId/status', async (req: Request, res: Response) => {
 
 /**
  * Get a list of all user's apiEndpoint
+ *
+ * Partner-only: the response carries every user's `credentials/pryv-api-endpoint`
+ * event, and a Pryv apiEndpoint embeds its auth token. This route shipped without
+ * the assertion its four siblings carry, leaving it readable by anyone who could
+ * reach the bridge (it is mounted at `/user` for every framework bridge — see
+ * `server.ts`). Fixed 2026-09-23.
  */
 router.get('/list/apiEndPoints', async (req: Request, res: Response) => {
+  errors.assertFromPartner(req as any);
   const users: unknown[] = [];
   function forEachEvent (event: unknown): void {
     users.push(event);
