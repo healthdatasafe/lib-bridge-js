@@ -1,4 +1,4 @@
-import { bridgeConnection, streamIdForUserId, getUserParentStreamId, getActiveUserStreamId } from '../lib/bridgeAccount.ts';
+import { bridgeConnection, streamIdForUserId, getUserParentStreamId, getActiveUserStreamId, getSyncStatus } from '../lib/bridgeAccount.ts';
 import { unkownRessource, serviceError, badRequest } from '../errors/index.ts';
 import { pryv } from 'hds-lib';
 
@@ -94,9 +94,6 @@ async function status (partnerUserId: string, throwUnkown = true): Promise<UserS
   const apiCalls = [{
     method: 'events.get',
     params: { streams: [streamUserId], limit: 1, types: ['credentials/pryv-api-endpoint'] }
-  }, {
-    method: 'events.get',
-    params: { streams: [streamUserId], limit: 1, types: ['sync-status/bridge'] }
   }];
   const resultFromBC: any = await bridgeConnection().api(apiCalls as any);
   if (resultFromBC[0]?.error?.id === 'unknown-referenced-resource') {
@@ -105,15 +102,23 @@ async function status (partnerUserId: string, throwUnkown = true): Promise<UserS
     }
     return null;
   }
-  const error = resultFromBC.error || resultFromBC[1]?.error || resultFromBC[1]?.error;
+  const error = resultFromBC.error || resultFromBC[0]?.error;
   if (error) serviceError('Failed to get user status', error);
   const userEvent = resultFromBC[0].events[0];
-  const syncEvent = resultFromBC[1].events[0];
   if (userEvent == null) {
     if (throwUnkown) {
       unkownRessource('Unkown user', { userId: partnerUserId });
     }
     return null;
+  }
+  const syncEvent = await getSyncStatus(partnerUserId);
+  // Bridges keeping `lastSyncedAt` (ms, null = never synced) update the event in place, so its
+  // time is the first write, not the last sync. Use the event time only when the key is absent.
+  // Pryv times are seconds.
+  const content = syncEvent?.content;
+  let lastSync = syncEvent?.time;
+  if (content != null && 'lastSyncedAt' in content) {
+    lastSync = typeof content.lastSyncedAt === 'number' ? content.lastSyncedAt / 1000 : undefined;
   }
   const result: UserStatus = {
     user: {
@@ -125,7 +130,7 @@ async function status (partnerUserId: string, throwUnkown = true): Promise<UserS
     },
     syncStatus: {
       content: syncEvent?.content,
-      lastSync: syncEvent?.time
+      lastSync
     }
   };
   return result;

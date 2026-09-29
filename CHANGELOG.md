@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-29
+
+### Changed
+
+- **One sync-state event per user, updated in place** (plan 101 T7). New `SyncStateStore`
+  (exported with `SYNC_STATUS_TYPE`) keeps a single `sync-status/bridge` event in the user's
+  bridge-account stream: merge-patch, update by id, create (with the per-user stream) when
+  absent, and an optional `legacyType` read as a fallback and migrated on the next write. It is
+  the store bridge-mira and bridge-tempdrop each carried as private `bridge/<key>-sync-state`
+  code, now shared.
+- `logSyncStatus` merges into that event instead of **appending a new event on every call**
+  (the account grew without bound). It returns `{ type, content }` with the merged content.
+- `GET /user/:id/status` reads the same event, so it reports the bridges' state instead of an
+  always-empty `lastSync`. `lastSync` comes from `content.lastSyncedAt` (ms, converted to
+  seconds; `null` means never synced) when the key is present, else the event time, which
+  `logSyncStatus` now stamps on every call.
+
+### Added
+
+- `GET /status` includes `commit` and `image` when the process runs from a CI-built image
+  (`SOURCE_COMMIT` / `IMAGE_VERSION`, plan 102), so deploy tooling can compare commits.
+
 ## [0.9.2] - 2026-09-23
 
 ### Fixed

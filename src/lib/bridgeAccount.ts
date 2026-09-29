@@ -4,6 +4,7 @@
 import boiler from 'dev-boiler';
 import { pryv } from 'hds-lib';
 import { internalError, serviceError } from '../errors/index.ts';
+import { SyncStateStore, SYNC_STATUS_TYPE } from './syncState.ts';
 
 const { getConfig, getLogger } = boiler;
 let _logger: ReturnType<typeof getLogger> | null = null;
@@ -155,18 +156,35 @@ async function logErrorOnBridgeAccount (message: string, errorObject: unknown = 
   return await createSingleEvent(params, 'logging error');
 }
 
+const syncStore = new SyncStateStore({
+  connection: () => bridgeConnection() as any,
+  mainStreamId: () => settings.mainStreamId!
+});
+
 /**
- * Log a successfull synchronization
+ * Record a synchronization: merges `content` into the user's single `sync-status/bridge`
+ * event, updated in place (it appended a new event per call until plan 101 T7).
+ * Returns `{ type, content }` with the merged content, or an error object.
  */
 async function logSyncStatus (partnerUserId: string, time: number | null = null, content: unknown = null): Promise<unknown> {
-  const userStreamId = streamIdForUserId(partnerUserId);
-  const params: Record<string, unknown> = {
-    type: 'sync-status/bridge',
-    streamIds: [userStreamId],
-    content
-  };
-  if (time != null) params.time = time;
-  return await createSingleEvent(params, 'creating log status');
+  const partial = (content != null && typeof content === 'object') ? content as Record<string, unknown> : { value: content };
+  try {
+    // Each call used to create an event stamped now; keep `status().lastSync` advancing.
+    const merged = await syncStore.patch(partnerUserId, partial, {}, time ?? Date.now() / 1000);
+    if (merged == null) {
+      logger().error('Failed creating log status on bridge account for', partnerUserId);
+      return { error: { id: 'sync-status-write-failed' } };
+    }
+    return { type: SYNC_STATUS_TYPE, content: merged };
+  } catch (e) {
+    logger().error('Failed creating log status on bridge account error:', e);
+    return e;
+  }
+}
+
+/** The user's sync-status event (content and time), or null. */
+async function getSyncStatus (partnerUserId: string): Promise<{ content: Record<string, unknown>, time?: number } | null> {
+  return await syncStore.getEvent(partnerUserId);
 }
 
 /**
@@ -216,5 +234,6 @@ export {
   getActiveUserStreamId,
   logErrorOnBridgeAccount,
   getErrorsOnBridgeAccount,
-  logSyncStatus
+  logSyncStatus,
+  getSyncStatus
 };

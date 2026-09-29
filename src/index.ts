@@ -28,6 +28,10 @@ export { getLogger } from './lib/PluginBridge.ts';
 // Shared cache (cluster-safe via memored)
 export { cacheGet, cacheSet, cacheDel, initCacheLocal } from './lib/cache.ts';
 
+// Durable per-user sync state, one `sync-status/bridge` event per user (plan 101 T7)
+export { SyncStateStore, SYNC_STATUS_TYPE } from './lib/syncState.ts';
+export type { SyncStateStoreOptions } from './lib/syncState.ts';
+
 // App-streams helper (Plan 25 / Plan 45 Phase 9)
 export { ensureAppStreamsTree } from './lib/appStreams.ts';
 export type {

@@ -60,8 +60,15 @@ async function createBridgeApp (plugin?: PluginBridge): Promise<Application> {
   newApp.use(loggerMiddleware);
   newApp.use(checkAuth.checkIfPartner);
 
+  // `commit` / `image` come from the CI-built image's env (plan 102 template); absent under a
+  // `git push` build, so dev-deploy's status.mjs can compare commits, not only versions.
+  const buildInfo: Record<string, string> = {};
+  for (const [key, env] of [['commit', 'SOURCE_COMMIT'], ['image', 'IMAGE_VERSION']] as const) {
+    const v = process.env[env];
+    if (v != null && v !== '' && v !== 'unknown') buildInfo[key] = v;
+  }
   newApp.get('/status', (_req, res) => {
-    res.json({ status: 'ok', name: pkg.name, version: pkg.version, uptime: Math.floor(process.uptime()) });
+    res.json({ status: 'ok', name: pkg.name, version: pkg.version, ...buildInfo, uptime: Math.floor(process.uptime()) });
   });
 
   // static ressource are temporary until handled by externall apps.
