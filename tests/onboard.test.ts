@@ -136,10 +136,12 @@ describe('[ONBX] Onboarding User with capture server on (Webhooks OK)', function
     await apiTest().post('/user/onboard').set(partnerAuth()).send(requestBody);
 
     // -- Phase 4 - Trigger finalize URL with wrong poll
+    // The poll URL is matched against the pending request before it is fetched (SSRF fix,
+    // 2026-09-29), so a bogus one is refused without any request going out.
     const returnURLResponse = await apiTest()
       .get(`/user/onboard/finalize/${partnerUserId}?prYvpoll=https://bogus`);
     assert.equal(returnURLResponse.status, 302);
-    assert.equal(returnURLResponse.headers.location, 'https://error.domain?message=Failed%20finalizing%20onboarding.');
+    assert.equal(returnURLResponse.headers.location, 'https://error.domain?message=No%20matching%20pending%20request');
   });
 });
 

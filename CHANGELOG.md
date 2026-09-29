@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-09-29
+
+### Security
+
+- **`GET /user/onboard/finalize/:partnerUserId` no longer fetches an unmatched `prYvpoll`.** The route
+  is anonymous (the user's browser reaches it on redirect) and fetched the query-string URL before
+  checking it against a pending onboarding request, so anyone could make a bridge request a URL of
+  their choice (blind SSRF). The URL is now matched against the poll URL the platform returned for a
+  pending request first, and fetched only on a match. A bogus `prYvpoll` now redirects with
+  `No matching pending request` instead of `Failed finalizing onboarding.` (2026-09-23 audit, M2.)
+- **`expressErrorHandler` sends `errorObject` only on 4xx.** On a 5xx it serialized whatever internal
+  object the throwing code had attached (the default status is 501, so any error without one
+  qualified). It is still logged server-side. (M3.)
+
 ## [0.10.1] - 2026-09-29
 
 ### Fixed

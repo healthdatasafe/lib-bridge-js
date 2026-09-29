@@ -36,7 +36,10 @@ function expressErrorHandler (err: AppError, req: Request, res: LogResponse, nex
     res.log404 = true; // tells the logger to keep this 404 in the logs.
   }
   const errorContent: { error: string; errorObject?: unknown } = { error: err.message };
-  if (err.errorObject) errorContent.errorObject = err.errorObject;
+  // SECURITY: `errorObject` is client-facing detail only for deliberate 4xx answers. On a
+  // 5xx it is whatever internal object the throwing code attached (upstream responses,
+  // webhook settings with their headers, …), so it stays in the log above and is not sent.
+  if (err.errorObject && statusCode < 500) errorContent.errorObject = err.errorObject;
   res.json(errorContent);
 }
 

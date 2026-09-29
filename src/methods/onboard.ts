@@ -159,9 +159,12 @@ async function finalizeToBeCatched (partnerUserId: string, pollParam: string | s
   // might be an Array ..
   const pollURL = Array.isArray(pollParam) ? pollParam[0] : pollParam;
   if (pollURL == null || !pollURL.startsWith('http')) badRequest('Missing or invalid prYvpoll URL');
-  const pollContent = await (await fetch(pollURL)).json() as any;
 
-  // safety check that onboard process has started
+  // SECURITY: match the poll URL against a pending request BEFORE fetching it. This route
+  // is reached anonymously (the user's browser, on redirect), and `prYvpoll` comes straight
+  // off the query string: fetching first let anyone make the bridge request a URL of their
+  // choice (blind SSRF, 2026-09-23 audit M2). A matched URL is the one the platform's
+  // `reg/access` returned when this bridge initiated the request.
   const currentAuthStatuses = await authStatusesGet(partnerUserId);
   const matchingStatuses = currentAuthStatuses.filter((s: any) => s.content.responseBody.poll === pollURL);
   if (matchingStatuses.length !== 1) {
@@ -169,6 +172,7 @@ async function finalizeToBeCatched (partnerUserId: string, pollParam: string | s
     // -- redirect to partner error page
     return getErrorRedirectURLWithMessage('No matching pending request');
   }
+  const pollContent = await (await fetch(pollURL)).json() as any;
   const matchingStatusContent = matchingStatuses[0].content;
   const webhookParams: Record<string, unknown> = Object.assign({ partnerUserId, onboardingSecret: matchingStatusContent.onboardingSecret }, matchingStatusContent.webhookClientData);
 
