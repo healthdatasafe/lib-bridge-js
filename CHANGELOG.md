@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-09-29
+
+### Fixed
+
+- `SyncStateStore` migration with duplicate legacy events. The old per-bridge stores could race
+  into two legacy events for one user with identical times (found on prod bridge-mira: one live,
+  one stale). Pryv's order for equal times is undefined, so migration could copy the stale one
+  and leave the live one behind. It now reads every legacy event for the user, migrates the most
+  recently modified, and deletes them all.
+
 ## [0.10.0] - 2026-09-29
 
 ### Changed

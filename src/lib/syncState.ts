@@ -9,8 +9,9 @@
  * which reads `sync-status/bridge`, always reported an empty `lastSync` for them. This store is
  * that bridge code, moved here, writing the declared data-model type.
  *
- * `legacyType` migrates lazily: when no `sync-status/bridge` event exists, the legacy event is
- * read instead; the next write creates the new event and deletes the legacy one.
+ * `legacyType` migrates lazily: when no `sync-status/bridge` event exists, the most recently
+ * modified legacy event is read instead; the next write creates the new event and deletes every
+ * legacy event for that user.
  *
  * The event-id cache is per worker; a stale id falls back to create. Concurrent writers can race
  * to create a duplicate (last writer wins); reads use `limit: 1`, so they stay consistent.
@@ -31,9 +32,13 @@ export interface SyncStateStoreOptions {
   legacyType?: string;
 }
 
+interface StoredEvent { id: string, content: any, time?: number, modified?: number }
+
 interface Located {
-  event: { id: string, content: any, time?: number } | null;
+  event: StoredEvent | null;
   legacy: boolean;
+  /** Every legacy event for the user, all deleted on migration. */
+  legacyIds: string[];
 }
 
 export class SyncStateStore<T extends object = Record<string, unknown>> {
@@ -52,17 +57,22 @@ export class SyncStateStore<T extends object = Record<string, unknown>> {
     const streams = [this.streamIdFor(partnerUserId)];
     const calls: any[] = [{ method: 'events.get', params: { streams, types: [SYNC_STATUS_TYPE], limit: 1 } }];
     if (this.#opts.legacyType != null) {
-      calls.push({ method: 'events.get', params: { streams, types: [this.#opts.legacyType], limit: 1 } });
+      // All of them: the old bridge stores could race into duplicates with identical times
+      // (prod mira had one), and Pryv's order for equal times is undefined. The live one is the
+      // one updated last.
+      calls.push({ method: 'events.get', params: { streams, types: [this.#opts.legacyType], limit: 100 } });
     }
     const res: any[] = await this.#opts.connection().api(calls);
     const current = res[0]?.events?.[0];
     if (current != null) {
       this.#eventIds.set(partnerUserId, current.id);
-      return { event: current, legacy: false };
+      return { event: current, legacy: false, legacyIds: [] };
     }
     this.#eventIds.delete(partnerUserId);
-    const legacy = res[1]?.events?.[0];
-    return { event: legacy ?? null, legacy: legacy != null };
+    const legacies: StoredEvent[] = res[1]?.events ?? [];
+    const legacy = legacies.reduce<StoredEvent | null>(
+      (best, e) => (best == null || (e.modified ?? 0) > (best.modified ?? 0) ? e : best), null);
+    return { event: legacy, legacy: legacy != null, legacyIds: legacies.map(e => e.id) };
   }
 
   /** The stored state for a user, or null if none. */
@@ -85,7 +95,7 @@ export class SyncStateStore<T extends object = Record<string, unknown>> {
    * result, like the bridge code it replaces: a sync must not fail because its bookkeeping did).
    */
   async patch (partnerUserId: string, partial: Partial<T>, defaults: Partial<T> = {}, time?: number): Promise<T | null> {
-    const { event, legacy } = await this.#locate(partnerUserId);
+    const { event, legacy, legacyIds } = await this.#locate(partnerUserId);
     const merged = { ...defaults, ...(event?.content ?? {}), ...partial } as T;
     const conn = this.#opts.connection();
 
@@ -113,8 +123,8 @@ export class SyncStateStore<T extends object = Record<string, unknown>> {
     const newEvent = created[1]?.event;
     if (newEvent?.id == null) return null;
     this.#eventIds.set(partnerUserId, newEvent.id);
-    if (legacy && event != null) {
-      await conn.api([{ method: 'events.delete', params: { id: event.id } }]);
+    if (legacy && legacyIds.length > 0) {
+      await conn.api(legacyIds.map(id => ({ method: 'events.delete', params: { id } })));
     }
     return merged;
   }

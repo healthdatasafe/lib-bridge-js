@@ -7,7 +7,7 @@ import { SyncStateStore, SYNC_STATUS_TYPE } from '../src/lib/syncState.ts';
  * events.create on a missing stream is rejected as the server does.
  */
 
-interface FakeEvent { id: string; streamIds: string[]; type: string; content: any; time: number; created: number }
+interface FakeEvent { id: string; streamIds: string[]; type: string; content: any; time: number; created: number; modified?: number }
 
 class FakeConn {
   store = new Map<string, FakeEvent>();
@@ -18,10 +18,10 @@ class FakeConn {
     return calls.map(c => this.one(c.method, c.params));
   }
 
-  add (type: string, content: any, streamId = 'main-users-alice'): FakeEvent {
+  add (type: string, content: any, streamId = 'main-users-alice', extra: Partial<FakeEvent> = {}): FakeEvent {
     this.streams.add(streamId);
     const id = 'e' + (++this.seq);
-    const e = { id, streamIds: [streamId], type, content, time: 1000 + this.seq, created: this.seq };
+    const e = { id, streamIds: [streamId], type, content, time: 1000 + this.seq, created: this.seq, ...extra };
     this.store.set(id, e);
     return e;
   }
@@ -134,6 +134,19 @@ describe('[SYST] SyncStateStore', () => {
     assert.deepEqual(events[0]!.content, { lastSyncedAt: 7, reauthNotifiedAt: 9, needsReauth: true });
     await store.patch('alice', { lastSyncedAt: 8 });
     assert.equal(conn.of(SYNC_STATUS_TYPE).length, 1, 'then updates in place');
+  });
+
+  // Prod mira 2026-09-29: two legacy events for one user with IDENTICAL times, one live and one
+  // stale. Pryv's order for equal times is undefined; the live one is the one modified last.
+  it('[SYSL] duplicate legacy events: the latest-modified is migrated and all are deleted', async () => {
+    const conn = new FakeConn();
+    conn.add('bridge/x-sync-state', { lastSyncedAt: 99 }, 'main-users-alice', { time: 500, modified: 900 });
+    conn.add('bridge/x-sync-state', { lastSyncedAt: null }, 'main-users-alice', { time: 500, modified: 100 });
+    const store = makeStore(conn, 'bridge/x-sync-state');
+    assert.deepEqual(await store.get('alice'), { lastSyncedAt: 99 });
+    await store.patch('alice', { needsReauth: false });
+    assert.equal(conn.of('bridge/x-sync-state').length, 0, 'both legacy events deleted');
+    assert.deepEqual(conn.of(SYNC_STATUS_TYPE)[0]!.content, { lastSyncedAt: 99, needsReauth: false });
   });
 
   it('[SYSH] the current event wins over a leftover legacy one', async () => {
