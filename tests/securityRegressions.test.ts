@@ -3,6 +3,8 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import express from 'express';
 import request from 'supertest';
+import type { Server } from 'node:http';
+import { listenLocal } from './helpers/localServer.ts';
 import initBoiler from '../src/initBoiler.ts';
 import userRouter from '../src/routes/userRoute.ts';
 import { expressErrorHandler, badRequest, internalError, serviceError } from '../src/errors/index.ts';
@@ -42,7 +44,7 @@ describe('[SECX] security regressions', function () {
       const app = express();
       app.use('/user', userRouter);
       app.use(expressErrorHandler);
-      await request(app).get(`/user/onboard/finalize/victim-user?prYvpoll=${encodeURIComponent(`http://127.0.0.1:${port}/internal`)}`);
+      await request(await listenLocal(app)).get(`/user/onboard/finalize/victim-user?prYvpoll=${encodeURIComponent(`http://127.0.0.1:${port}/internal`)}`);
       assert.equal(hits, 0, 'the bridge requested an attacker-chosen URL before matching it to a pending onboarding');
     } finally {
       await new Promise<void>((resolve) => probe.close(() => resolve()));
@@ -64,16 +66,20 @@ describe('[SECX] security regressions', function () {
       throw e;
     });
     app.use(expressErrorHandler);
+    let server: Server;
+    before(async function () {
+      server = await listenLocal(app);
+    });
 
     it('[SECB] a 4xx keeps its errorObject (deliberate client-facing detail)', async () => {
-      const res = await request(app).get('/bad');
+      const res = await request(server).get('/bad');
       assert.equal(res.status, 400);
       assert.deepEqual(res.body.errorObject, { field: 'x' });
     });
 
     for (const path of ['/internal', '/service', '/plain']) {
       it(`[SECI] a 5xx does not send errorObject (${path})`, async () => {
-        const res = await request(app).get(path);
+        const res = await request(server).get(path);
         assert.ok(res.status >= 500, `expected a 5xx, got ${res.status}`);
         assert.equal(res.body.errorObject, undefined);
         assert.ok(!JSON.stringify(res.body).includes('internal-detail'));

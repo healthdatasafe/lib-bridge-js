@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import express from 'express';
 import request from 'supertest';
+import type { Server } from 'node:http';
+import { listenLocal } from './helpers/localServer.ts';
 import initBoiler from '../src/initBoiler.ts';
 import * as checkAuth from '../src/middlewares/checkAuth.ts';
 import userRouter from '../src/routes/userRoute.ts';
@@ -19,7 +21,7 @@ import { expressErrorHandler } from '../src/errors/index.ts';
  */
 describe('[USAX] Users — partner auth', function () {
   this.timeout(5000);
-  let app: express.Application;
+  let server: Server;
   let partnerToken: string;
 
   before(async function () {
@@ -28,11 +30,12 @@ describe('[USAX] Users — partner auth', function () {
     partnerToken = config.get<string>('partnerAuthToken');
     await checkAuth.init();
 
-    app = express();
+    const app = express();
     app.use(express.json());
     app.use(checkAuth.checkIfPartner);
     app.use('/user', userRouter);
     app.use(expressErrorHandler);
+    server = await listenLocal(app);
   });
 
   /**
@@ -44,24 +47,24 @@ describe('[USAX] Users — partner auth', function () {
    * each deployed one. Fixed 2026-09-23.
    */
   it('[USAN] GET /user/list/apiEndPoints - rejects a caller with no auth header', async () => {
-    const res = await request(app).get('/user/list/apiEndPoints');
+    const res = await request(server).get('/user/list/apiEndPoints');
     assert.equal(res.status, 401);
     assert.equal(res.body.users, undefined);
   });
 
   it('[USAB] GET /user/list/apiEndPoints - rejects a wrong partner token', async () => {
-    const res = await request(app).get('/user/list/apiEndPoints').set({ authorization: 'not-the-partner-token' });
+    const res = await request(server).get('/user/list/apiEndPoints').set({ authorization: 'not-the-partner-token' });
     assert.equal(res.status, 401);
     assert.equal(res.body.users, undefined);
   });
 
   it('[USAS] GET /user/:partnerUserId/status - rejects a caller with no auth header', async () => {
-    const res = await request(app).get('/user/someone/status');
+    const res = await request(server).get('/user/someone/status');
     assert.equal(res.status, 401);
   });
 
   it('[USAP] POST /user/:partnerUserId/status - rejects a caller with no auth header', async () => {
-    const res = await request(app).post('/user/someone/status').send({ active: false });
+    const res = await request(server).post('/user/someone/status').send({ active: false });
     assert.equal(res.status, 401);
   });
 
@@ -72,7 +75,7 @@ describe('[USAX] Users — partner auth', function () {
    * only thing asserted is "not 401".
    */
   it('[USAV] a valid partner token passes the auth gate', async () => {
-    const res = await request(app).get('/user/list/apiEndPoints').set({ authorization: partnerToken });
+    const res = await request(server).get('/user/list/apiEndPoints').set({ authorization: partnerToken });
     assert.notEqual(res.status, 401);
   });
 });

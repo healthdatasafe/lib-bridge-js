@@ -1,6 +1,8 @@
 import initBoiler from '../../src/initBoiler.ts';
 import { initCacheLocal } from '../../src/lib/cache.ts';
 import request from 'supertest';
+import type { Server } from 'node:http';
+import { listenLocal } from './localServer.ts';
 import ShortUniqueId from 'short-unique-id';
 import { getApp } from '../../src/server.ts';
 import * as pryvService from '../../src/lib/pryvService.ts';
@@ -13,6 +15,7 @@ import type PluginBridge from '../../src/lib/PluginBridge.ts';
 import SampleBridge from '../sample-bridge/index.ts';
 
 let app: Application | null = null;
+let appServer: Server | null = null;
 let config: Config | null = null;
 
 /**
@@ -26,6 +29,7 @@ async function init (plugin?: PluginBridge, configDir?: string): Promise<void> {
   await initHDSModel();
   config = await getConfig();
   app = await getApp(plugin || new SampleBridge());
+  appServer = await listenLocal(app);
   await pryvService.init();
 }
 
@@ -52,8 +56,8 @@ async function bridgeIsConfigured (): Promise<boolean> {
  * Get a supertest Request bound to the server app
  */
 function apiTest (options?: Record<string, unknown>) {
-  if (app === null) throw new Error('Call testServer.init() first');
-  return request(app, options);
+  if (appServer === null) throw new Error('Call testServer.init() first');
+  return request(appServer, options);
 }
 
 /**
