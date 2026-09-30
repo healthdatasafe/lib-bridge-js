@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Lockfile: hds-lib 2.6.5 (`@pryv/cmc` 3.17.0 (popup-mode `requestAccept` / `requestScopeUpdate` ignore messages that do not come from their popup; optional `expectedOrigin`; `dataGrantApiEndpoint` dropped from the accept-result types)). Not a release; consumers tracking `main` pick it up on their
+  next lock refresh.
+
 ## [0.10.2] - 2026-09-29
 
 ### Security
