@@ -9,6 +9,8 @@ export interface AppError extends Error {
   errorObject?: unknown;
   skipWebHookCall?: boolean;
   webhookParams?: Record<string, unknown>;
+  /** finalize must answer with this error as is: no webhook, no error redirect */
+  noErrorRedirect?: boolean;
 }
 
 interface PartnerRequest extends Request {

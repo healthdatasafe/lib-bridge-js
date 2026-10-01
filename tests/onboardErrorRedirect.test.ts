@@ -18,7 +18,8 @@ describe('[OERX] onboard error redirect', function () {
     it(`[OER2] answers 400 instead of redirecting when the target is ${JSON.stringify(base)}`, () => {
       assert.throws(
         () => errorRedirectURL(base, 'No matching pending request'),
-        (e: any) => e.statusCode === 400 && e.message === 'Bad request: No matching pending request'
+        // noErrorRedirect: finalize passes it through as is, with no webhook to a placeholder URL
+        (e: any) => e.statusCode === 400 && e.noErrorRedirect === true && e.message === 'Bad request: No matching pending request'
       );
     });
   }

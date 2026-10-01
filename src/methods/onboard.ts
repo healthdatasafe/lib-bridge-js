@@ -129,6 +129,7 @@ async function finalize (partnerUserId: string, pollParam: string | string[]): P
   try {
     return await finalizeToBeCatched(partnerUserId, pollParam);
   } catch (e: any) {
+    if (e.noErrorRedirect) throw e;
     if (!e.skipWebHookCall) {
       const webhookParams: Record<string, unknown> = Object.assign(
         {
@@ -313,7 +314,12 @@ function getErrorRedirectURLWithMessage (message: string): string {
  * (B-2026-09-29-6). Without an absolute http(s) URL, answer 400 with the message instead.
  */
 function errorRedirectURL (base: unknown, message: string): string {
-  if (typeof base !== 'string' || !/^https?:\/\/[^/?#\s]+/i.test(base)) badRequest(message);
+  if (typeof base !== 'string' || !/^https?:\/\/[^/?#\s]+/i.test(base)) {
+    const e: AppError = new Error('Bad request: ' + message);
+    e.statusCode = 400;
+    e.noErrorRedirect = true;
+    throw e;
+  }
   return base + '?message=' + encodeURIComponent(message);
 }
 

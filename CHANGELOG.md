@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.10.4] - 2026-10-01
+
+### Fixed
+
+- 0.10.3's 400 was caught by `finalize`'s error path, which then called the partner webhook (also
+  `OVERRIDE_ME` on those bridges) and answered **501 "Failed contacting partner backend"**. The error now
+  carries `noErrorRedirect` and `finalize` passes it through as is: **400** with the real message, no
+  webhook. Seen live on demo and prod `bridge-mira` 1.9.3, 2026-10-01.
+
 ## [0.10.3] - 2026-10-01
 
 ### Fixed
