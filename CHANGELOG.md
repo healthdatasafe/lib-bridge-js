@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.10.3] - 2026-10-01
+
+### Fixed
+
+- **`/user/onboard/finalize` no longer redirects to the `OVERRIDE_ME` placeholder.** Bridges that onboard
+  through CMC never configure `partnerURLs.defaultRedirectOnError` and ship the placeholder, so a failed
+  finalize sent the user to `…/user/onboard/finalize/OVERRIDE_ME?message=…`, a dead page (demo and prod,
+  `B-2026-09-29-6`). Without an absolute http(s) URL the route now answers **400** with the same message;
+  a configured URL still gets the redirect. Tests `[OER1]`, `[OER2]`.
+
 ### Changed
 
 - Lockfile: hds-lib 2.6.5 (`@pryv/cmc` 3.17.0 (popup-mode `requestAccept` / `requestScopeUpdate` ignore messages that do not come from their popup; optional `expectedOrigin`; `dataGrantApiEndpoint` dropped from the accept-result types)). Not a release; consumers tracking `main` pick it up on their

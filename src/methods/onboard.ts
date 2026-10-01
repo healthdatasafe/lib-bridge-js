@@ -304,8 +304,17 @@ async function webhookCall (whSettings: any, params: Record<string, unknown>): P
 }
 
 function getErrorRedirectURLWithMessage (message: string): string {
-  const encodedMessage = encodeURIComponent(message);
-  return settings.partnerURLs.defaultRedirectOnError + '?message=' + encodedMessage;
+  return errorRedirectURL(settings.partnerURLs?.defaultRedirectOnError, message);
 }
 
-export { init, initiate, finalize, authStatusesGet, authStatusesClean };
+/**
+ * Bridges that onboard through CMC never configure `partnerURLs.defaultRedirectOnError`
+ * and ship the `OVERRIDE_ME` placeholder, which redirected users to a dead relative path
+ * (B-2026-09-29-6). Without an absolute http(s) URL, answer 400 with the message instead.
+ */
+function errorRedirectURL (base: unknown, message: string): string {
+  if (typeof base !== 'string' || !/^https?:\/\/[^/?#\s]+/i.test(base)) badRequest(message);
+  return base + '?message=' + encodeURIComponent(message);
+}
+
+export { init, initiate, finalize, authStatusesGet, authStatusesClean, errorRedirectURL };
