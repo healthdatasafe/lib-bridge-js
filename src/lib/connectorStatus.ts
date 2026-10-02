@@ -62,8 +62,9 @@ export function nowSeconds (): number {
   return Math.floor(Date.now() / 1000);
 }
 
+/** A finite time, as whole Unix seconds (Pryv event times carry a fraction; the status does not). */
 function num (v: unknown): number | undefined {
-  return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+  return typeof v === 'number' && Number.isFinite(v) ? Math.floor(v) : undefined;
 }
 
 function cleanError (e: unknown): ConnectorStatusError | undefined {
@@ -164,23 +165,83 @@ interface ApiConnection {
   api: (calls: any[]) => Promise<any>;
 }
 
-/** An API error result, thrown so the caller can branch on `id` (e.g. `forbidden`). */
+/**
+ * An API error, thrown so the caller can branch on `id` (e.g. `forbidden`). Either a per-call
+ * error result, or (`topLevel`) the whole request refused by the core, e.g. an invalid, revoked or
+ * expired user token, which lib-js surfaces as "API call result is not an Array".
+ */
 export class ConnectorStatusApiError extends Error {
   id: string;
-  constructor (method: string, error: { id?: string, message?: string } | undefined) {
-    super(`${method} failed: ${error?.id ?? 'unknown-error'}${error?.message != null ? ` (${error.message})` : ''}`);
+  /** True when the core refused the whole request (no per-call results). */
+  topLevel: boolean;
+  constructor (method: string, error: { id?: string, message?: string } | undefined, topLevel = false) {
+    super(`${method} failed${topLevel ? ' (request refused)' : ''}: ${error?.id ?? 'unknown-error'}${error?.message != null ? ` (${error.message})` : ''}`);
     this.name = 'ConnectorStatusApiError';
     this.id = error?.id ?? 'unknown-error';
+    this.topLevel = topLevel;
   }
 }
 
+/** Error ids that mean the access cannot be used for the leaf, whatever the call. */
+const ACCESS_ERROR_IDS: readonly string[] = [
+  'forbidden', // no permission on the leaf (an old grant), or an expired access
+  'unknown-referenced-resource', // the leaf stream was never provisioned
+  'invalid-access-token', // the grant was revoked or deleted
+  'denied-stream-access'
+];
+
 /**
- * True for an error that means "this access has no usable leaf": an old grant without the
- * leaf (`forbidden`) or a leaf stream that was never provisioned (`unknown-referenced-resource`).
+ * True for an error that means "this grant cannot write the status": an old grant without the
+ * leaf (`forbidden`), a leaf that was never provisioned (`unknown-referenced-resource`), a
+ * revoked/deleted/expired user token (`invalid-access-token`, `forbidden`, refused for the whole
+ * request), or a whole request refused as `unknown-resource` (the account is gone). Callers warn
+ * once and do not retry loudly; the user has to reconnect.
  */
 export function isConnectorStatusAccessError (e: unknown): boolean {
-  const id = (e as { id?: unknown })?.id;
-  return id === 'forbidden' || id === 'unknown-referenced-resource';
+  const err = e as { id?: unknown, topLevel?: unknown };
+  if (typeof err?.id !== 'string') return false;
+  if (ACCESS_ERROR_IDS.includes(err.id)) return true;
+  return err.topLevel === true && err.id === 'unknown-resource';
+}
+
+type ApiErrorBody = { id?: string, message?: string };
+
+const NOT_AN_ARRAY = 'API call result is not an Array: ';
+
+/**
+ * The core's error from a request refused as a whole, as lib-js reports it:
+ * - pryv >= 3.14: a PryvError "API call result is not an Array" whose `innerObject` is the answer
+ *   body (`{ error: { id, message }, meta }`); a structured PryvError has `id` /
+ *   `response.body.error`;
+ * - pryv <= 3.13: a plain Error whose message carries the body as JSON after the same prefix.
+ */
+function topLevelApiError (e: unknown): ApiErrorBody | undefined {
+  const err = e as { innerObject?: { error?: ApiErrorBody }, id?: unknown, response?: { body?: { error?: ApiErrorBody } }, message?: unknown };
+  const found = err?.innerObject?.error ?? err?.response?.body?.error ??
+    (typeof err?.id === 'string' ? { id: err.id } : undefined);
+  if (found?.id != null) return found;
+  if (typeof err?.message === 'string' && err.message.startsWith(NOT_AN_ARRAY)) {
+    try {
+      const body = JSON.parse(err.message.slice(NOT_AN_ARRAY.length));
+      if (typeof body?.error?.id === 'string') return body.error;
+    } catch { /* not JSON */ }
+  }
+  return undefined;
+}
+
+/**
+ * `conn.api(calls)`, with a request the core refused as a whole (invalid, revoked or expired user
+ * token...) turned into a ConnectorStatusApiError (`topLevel`) carrying the core's error id.
+ * Anything else (a network failure) is rethrown as is.
+ */
+async function callApi (conn: ApiConnection, method: string, calls: any[]): Promise<any[]> {
+  try {
+    return await conn.api(calls);
+  } catch (e) {
+    const apiError = topLevelApiError(e);
+    if (apiError != null) throw new ConnectorStatusApiError(method, apiError, true);
+    throw e;
+  }
 }
 
 interface FoundEvent {
@@ -194,7 +255,7 @@ interface FoundEvent {
 const FIND_LIMIT = 10;
 
 async function findStatusEvent (conn: ApiConnection, leafStreamId: string): Promise<FoundEvent | null> {
-  const res: any[] = await conn.api([{
+  const res: any[] = await callApi(conn, 'events.get', [{
     method: 'events.get',
     params: { streams: [leafStreamId], types: [CONNECTOR_STATUS_TYPE], limit: FIND_LIMIT }
   }]);
@@ -230,12 +291,12 @@ async function writeStatus (
   const clean = sanitizeConnectorStatus(content);
   if (clean == null) throw new Error(`Invalid connector status content: status ${String(content?.status)}`);
   if (existing != null) {
-    const res: any[] = await conn.api([{ method: 'events.update', params: { id: existing.id, update: { content: clean } } }]);
+    const res: any[] = await callApi(conn, 'events.update', [{ method: 'events.update', params: { id: existing.id, update: { content: clean } } }]);
     if (res?.[0]?.error != null) throw new ConnectorStatusApiError('events.update', res[0].error);
     await removeDuplicates(conn, existing.duplicateIds);
     return { action: 'updated', eventId: existing.id, content: clean };
   }
-  const res: any[] = await conn.api([{
+  const res: any[] = await callApi(conn, 'events.create', [{
     method: 'events.create',
     params: { streamIds: [leafStreamId], type: CONNECTOR_STATUS_TYPE, content: clean }
   }]);

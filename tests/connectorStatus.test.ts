@@ -12,6 +12,7 @@ import {
   buildRedirectUrl
 } from '../src/lib/connectorStatus.ts';
 import type { ConnectorStatusContent } from '../src/lib/connectorStatus.ts';
+import { pryv } from 'hds-lib';
 
 /**
  * Unit coverage for the connector status published in the user's account
@@ -71,6 +72,10 @@ describe('[CSTX] connector status — nextConnectorStatus (pure)', () => {
   it('[CSTA] connected from nothing: active + connectedAt, nothing else', () => {
     assert.deepEqual(nextConnectorStatus(null, { kind: 'connected' }, 100), { status: 'active', connectedAt: 100 });
     assert.deepEqual(nextConnectorStatus(null, { kind: 'connected', at: 90 }, 100), { status: 'active', connectedAt: 90 });
+    // A Pryv event time carries a fraction; the status stores whole seconds.
+    assert.deepEqual(nextConnectorStatus(null, { kind: 'connected', at: 90.367 }, 100), { status: 'active', connectedAt: 90 });
+    assert.deepEqual(nextConnectorStatus({ status: 'active', connectedAt: 90 }, { kind: 'connected', at: 90.9 }, 100),
+      { status: 'active', connectedAt: 90 });
   });
 
   it('[CSTB] a fresh connect resets connectedAt and drops lastError, keeps run fields', () => {
@@ -271,5 +276,81 @@ describe('[CSRU] return URL helpers', () => {
     assert.equal(u.searchParams.get('capabilityUrl'), cap);
     assert.equal(u.searchParams.has('skip'), false);
     assert.equal(new URL(buildRedirectUrl('https://a.example/p?error=old#frag', { error: 'partner-denied' })).searchParams.get('error'), 'partner-denied');
+  });
+});
+
+/**
+ * Demo 2026-10-02 (bridge-mira 1.10.0): users whose grant was revoked/expired logged
+ * "publishing status failed: API call result is not an Array" on every run. The core refuses the
+ * whole batch (`{ error: { id: 'invalid-access-token' }, meta }`, no `results`), and lib-js throws
+ * instead of returning per-call errors. That is a "grant unusable" case like `forbidden`.
+ */
+describe('[CSEX] connector status — request refused as a whole', () => {
+  const refusal = (id: string) => ({ error: { id, message: `core says ${id}` }, meta: { serverTime: 1 } });
+
+  /** pryv >= 3.14 shape: PryvError with the body as innerObject. */
+  function pryv314Conn (id: string) {
+    return {
+      api: async () => {
+        const e = new Error('API call result is not an Array') as Error & { innerObject?: unknown };
+        e.name = 'PryvError';
+        e.innerObject = refusal(id);
+        throw e;
+      }
+    };
+  }
+  /** pryv <= 3.13 shape: plain Error, body as JSON in the message. */
+  function pryv313Conn (id: string) {
+    return { api: async () => { throw new Error('API call result is not an Array: ' + JSON.stringify(refusal(id))); } };
+  }
+
+  for (const [label, make] of [['pryv 3.14', pryv314Conn], ['pryv 3.13', pryv313Conn]] as const) {
+    it(`[CSE1] ${label}: a revoked/invalid token is an access error carrying the core id`, async () => {
+      await assert.rejects(() => recordConnectorOutcome(make('invalid-access-token'), LEAF, { kind: 'reauth' }), (e: any) => {
+        assert.equal(e.id, 'invalid-access-token');
+        assert.equal(e.topLevel, true);
+        assert.equal(isConnectorStatusAccessError(e), true);
+        return true;
+      });
+    });
+  }
+
+  it('[CSE2] an expired access (forbidden) and a vanished account (top-level unknown-resource) are access errors too', async () => {
+    for (const id of ['forbidden', 'unknown-resource']) {
+      await assert.rejects(() => publishConnectorStatus(pryv314Conn(id), LEAF, { status: 'active' }), (e: unknown) => isConnectorStatusAccessError(e));
+    }
+  });
+
+  it('[CSE3] a per-call unknown-resource is NOT an access error (only a whole-request refusal is)', () => {
+    assert.equal(isConnectorStatusAccessError({ id: 'unknown-resource', topLevel: false }), false);
+  });
+
+  it('[CSE4] a refusal for another reason, or a network failure, is not an access error', async () => {
+    await assert.rejects(() => publishConnectorStatus(pryv314Conn('too-many-requests'), LEAF, { status: 'active' }), (e: unknown) => {
+      assert.equal((e as { id: string }).id, 'too-many-requests');
+      assert.equal(isConnectorStatusAccessError(e), false);
+      return true;
+    });
+    const net = { api: async () => { throw new TypeError('fetch failed'); } };
+    await assert.rejects(() => publishConnectorStatus(net, LEAF, { status: 'active' }), (e: unknown) => {
+      assert.equal((e as Error).message, 'fetch failed', 'rethrown as is');
+      assert.equal(isConnectorStatusAccessError(e), false);
+      return true;
+    });
+  });
+
+  it('[CSE5] the real lib-js Connection against a core answering a top-level invalid-access-token', async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response(JSON.stringify(refusal('invalid-access-token')), { status: 403, headers: { 'content-type': 'application/json' } })) as typeof fetch;
+    try {
+      const conn = new pryv.Connection('https://revoked@user.example/');
+      await assert.rejects(() => recordConnectorOutcome(conn as any, LEAF, { kind: 'reauth' }), (e: any) => {
+        assert.equal(e.id, 'invalid-access-token');
+        assert.equal(isConnectorStatusAccessError(e), true);
+        return true;
+      });
+    } finally {
+      globalThis.fetch = realFetch;
+    }
   });
 });

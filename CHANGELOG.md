@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-10-02
+
+- Connector status times are stored as whole Unix seconds (`connectedAt` came from a Pryv event time with a fraction).
+
+### Fixed
+
+- **Connector status: a revoked or expired user grant is a "grant unusable" case**, not a failure
+  logged on every run. When the core refuses a whole request (`invalid-access-token`, an expired
+  access's `forbidden`, …) it sends no per-call results, and lib-js throws "API call result is not an
+  Array" (seen on demo bridge-mira 1.10.0, 2026-10-02, for users whose Mira credential had also died).
+  `publishConnectorStatus` / `readConnectorStatus` / `recordConnectorOutcome` now turn that into a
+  `ConnectorStatusApiError` with the core's error id and `topLevel: true` (both lib-js error shapes:
+  3.14's PryvError `innerObject` and 3.13's JSON message), and `isConnectorStatusAccessError` covers
+  `invalid-access-token`, `denied-stream-access` and a whole-request `unknown-resource` as well. A
+  network failure is still rethrown as is.
+
 ## [0.11.0] - 2026-10-02
 
 ### Added
