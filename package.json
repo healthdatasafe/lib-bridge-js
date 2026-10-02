@@ -34,7 +34,7 @@
     "dev-boiler": "github:healthdatasafe/dev-boiler",
     "express": "^4.19.2",
     "express-promise-router": "^4.1.1",
-    "hds-lib": "github:healthdatasafe/hds-lib-js",
+    "hds-lib": "github:healthdatasafe/hds-lib-js#2.8.0",
     "hds-observability-js": "github:healthdatasafe/hds-observability-js",
     "memored": "^1.1.1",
     "short-unique-id": "^5.2.0"

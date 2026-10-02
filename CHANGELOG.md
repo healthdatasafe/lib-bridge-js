@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- hds-lib 2.8.0 (pryv 3.14.2)
+
 ## [0.10.4] - 2026-10-01
 
 ### Fixed
