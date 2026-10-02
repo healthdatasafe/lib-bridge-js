@@ -32,6 +32,38 @@ export { cacheGet, cacheSet, cacheDel, initCacheLocal } from './lib/cache.ts';
 export { SyncStateStore, SYNC_STATUS_TYPE } from './lib/syncState.ts';
 export type { SyncStateStoreOptions } from './lib/syncState.ts';
 
+// Connector status in the USER's account, one `sync-status/connector-v1` event per
+// `sync-status-<connector>` leaf (data-model 3.13.0), plus the return-URL allow-list helpers
+// used after a partner OAuth.
+export {
+  CONNECTOR_STATUS_TYPE,
+  CONNECTOR_ERROR_CODE_PATTERN,
+  ConnectorStatusApiError,
+  nowSeconds,
+  sanitizeConnectorStatus,
+  nextConnectorStatus,
+  readConnectorStatus,
+  publishConnectorStatus,
+  recordConnectorOutcome,
+  isConnectorStatusAccessError,
+  normalizeAllowedOrigins,
+  isAllowedReturnUrl,
+  buildRedirectUrl
+} from './lib/connectorStatus.ts';
+export type {
+  ConnectorStatusContent,
+  ConnectorStatusValue,
+  ConnectorStatusError,
+  ConnectorErrorClass,
+  ConnectorOutcome,
+  PublishConnectorStatusResult
+} from './lib/connectorStatus.ts';
+
+// Scheduler role: exactly one live cluster worker runs periodic jobs, handed to the
+// replacement when it dies. Workers call `isSchedulerWorker()`.
+export { isSchedulerWorker, createSchedulerRole, SCHEDULER_ENV } from './lib/schedulerRole.ts';
+export type { SchedulerRole } from './lib/schedulerRole.ts';
+
 // App-streams helper (Plan 25 / Plan 45 Phase 9)
 export { ensureAppStreamsTree } from './lib/appStreams.ts';
 export type {

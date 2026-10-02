@@ -5,6 +5,7 @@ import * as server from './server.ts';
 import type PluginBridge from './lib/PluginBridge.ts';
 import { initCacheMaster } from './lib/cache.ts';
 import { createCrashLoopMonitor, type CrashLoopIncident } from './lib/crashLoopMonitor.ts';
+import { createSchedulerRole } from './lib/schedulerRole.ts';
 
 // New Relic APM agent removed (plan 88): no vendor SDK runs in the process.
 // Crash-loops are now detected by the host collector's container-uptime metric
@@ -40,6 +41,9 @@ export default async function startCluster (plugin?: PluginBridge, configDir?: s
     const configNumProcesses = config.get<number>('start:numProcesses') || numCPUs;
     const numProcesses = configNumProcesses < 0 ? Math.max(numCPUs + configNumProcesses, 1) : configNumProcesses;
     const exitOnCrashLoop = config.get<boolean>('start:exitOnCrashLoop') === true;
+    // One live worker holds the scheduler role; its replacement inherits it (see schedulerRole.ts).
+    const schedulerRole = createSchedulerRole();
+    const forkWorker = (): number => schedulerRole.fork((env) => cluster.fork(env).id);
 
     const monitor = createCrashLoopMonitor({
       exitOnCrashLoop,
@@ -55,8 +59,7 @@ export default async function startCluster (plugin?: PluginBridge, configDir?: s
       },
       clearTimer: (handle) => { clearTimeout(handle as NodeJS.Timeout); },
       onFork: () => {
-        const worker = cluster.fork();
-        monitor.workerForked(worker.id);
+        monitor.workerForked(forkWorker());
       },
       onNoticeError: (incident) => {
         logger.error(
@@ -93,11 +96,12 @@ export default async function startCluster (plugin?: PluginBridge, configDir?: s
     process.once('SIGINT', () => onSignal('SIGINT'));
 
     for (let i = 0; i < numProcesses; i++) {
-      const worker = cluster.fork();
-      monitor.workerForked(worker.id);
+      monitor.workerForked(forkWorker());
     }
 
     cluster.on('exit', (worker, code, signal) => {
+      // Free the role BEFORE the monitor reforks, so the replacement inherits it.
+      schedulerRole.workerExited(worker.id);
       monitor.workerExited(worker.id, code, signal, worker.exitedAfterDisconnect === true);
     });
   } else {

@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-02
+
+### Added
+
+- **Connector status in the user's account** (`sync-status/connector-v1`, data-model 3.13.0). New
+  module `connectorStatus`: `publishConnectorStatus(userConnection, leafStreamId, content)` updates the
+  leaf's single event in place, else creates it; `readConnectorStatus`; `recordConnectorOutcome`
+  (one read, then write) and the pure `nextConnectorStatus(previous, outcome)` for
+  `connected` / `success` / `reauth` / `failure` / `disconnected`. `connectedAt`, `lastSuccessAt` and
+  `syncedUntil` carry forward, `lastRunAt` is set on every run, a fresh connect resets `connectedAt`
+  and drops `lastError`, and a replayed connect (not newer than `connectedAt`) writes nothing. Times
+  are Unix seconds; an invalid `lastError.code` is dropped rather than written. API errors throw
+  `ConnectorStatusApiError`; `isConnectorStatusAccessError` spots an access without the leaf. Extra
+  events left on the leaf by a create race between cluster workers are trashed on the next write
+  (one event per leaf; the most recent is kept).
+- **Return-URL allow-list helpers** for sending the user back after a partner OAuth:
+  `isAllowedReturnUrl(url, allowedOrigins)` (exact origin, https only, no userinfo; empty list refuses
+  everything), `normalizeAllowedOrigins` (array, JSON string or comma list) and `buildRedirectUrl`
+  (sets query params through the URL API).
+
+### Fixed
+
+- **Scheduler role survives worker respawns.** Bridges elected their periodic-job worker by
+  `cluster.worker.id === 1`, and Node never reuses a worker id, so once worker 1 died no worker ran
+  the daily sync until the app restarted. The cluster master now marks exactly one fork with
+  `HDS_BRIDGE_SCHEDULER=1` (all others get `0`, explicitly) and hands the role to the replacement
+  when that worker exits. Workers call the new `isSchedulerWorker()` (true in an unclustered
+  process); `createSchedulerRole` is the pure controller behind it.
+
 ### Changed
 
 - hds-lib 2.8.0 (pryv 3.14.2)
