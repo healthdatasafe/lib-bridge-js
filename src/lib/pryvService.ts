@@ -30,14 +30,43 @@ async function init (): Promise<unknown> {
   config = (await getConfig()).get('service');
   if (!config.appId) throw new Error('Cannot find appId in config');
   try {
-    serviceSingleton = new HDSService(config.serviceInfoURL);
-    infosSingleton = await serviceSingleton.info();
-    await initHDSModel();
+    // A transient failure here used to kill every worker at boot (B-2026-10-02-3).
+    infosSingleton = await withRetry(async () => {
+      serviceSingleton = new HDSService(config.serviceInfoURL);
+      const infos = await serviceSingleton.info();
+      await initHDSModel();
+      return infos;
+    }, BOOT_FETCH_RETRY, (err, attempt, delayMs) => {
+      logger().warn(`Service info / HDS model fetch failed (attempt ${attempt}), retrying in ${delayMs}ms: ${err.message}`);
+    });
     return infosSingleton;
   } catch (err: any) {
     internalError('Failed connecting to service instance ' + err.message, config);
   }
   return null;
+}
+
+const BOOT_FETCH_RETRY = { attempts: 6, delayMs: 1000 }; // 1+2+4+8+16 s of backoff, about 31 s
+
+/**
+ * Run `fn` up to `attempts` times, doubling the delay after each failure.
+ * Rethrows the last error.
+ */
+async function withRetry<T> (
+  fn: () => Promise<T>,
+  { attempts, delayMs }: { attempts: number, delayMs: number },
+  onRetry?: (err: any, attempt: number, delayMs: number) => void
+): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      if (attempt >= attempts) throw err;
+      const wait = delayMs * 2 ** (attempt - 1);
+      onRetry?.(err, attempt, wait);
+      await new Promise((resolve) => setTimeout(resolve, wait));
+    }
+  }
 }
 
 interface CreateUserResult {
@@ -132,4 +161,4 @@ function getNewUserId (startWith = 'x'): string {
   return id;
 }
 
-export { init, userExists, createuser, service };
+export { init, userExists, createuser, service, withRetry };

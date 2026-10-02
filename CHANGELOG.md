@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-10-02
+
+### Fixed
+
+- **A transient failure fetching service info or the HDS model no longer kills every worker at boot.**
+  `pryvService.init` made a single attempt, so a restart of prod bridge-mira on 2026-10-02 crash-looped all
+  workers on `fetch failed` for about 3 minutes (502s) until a re-fork found the fetch working. It now retries
+  up to 6 times with doubling backoff (about 31 s), logging each retry, before failing as before
+  (`B-2026-10-02-3`). Tests `[BFR1]`, `[BFR2]`.
+
 ## [0.11.1] - 2026-10-02
 
 - Connector status times are stored as whole Unix seconds (`connectedAt` came from a Pryv event time with a fraction).
