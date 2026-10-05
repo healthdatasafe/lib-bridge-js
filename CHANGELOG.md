@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.11.3] - 2026-10-05
+
+### Changed
+
+- **hds-lib 2.10.0** (pryv 3.15.0, `@pryv/cmc` 3.17.1). One runtime change from lib-js 3.15.0: `PryvError.innerObject`
+  / `.response` are no longer enumerable; `connectorStatus` reads them by name, so nothing here changes.
+
 ## [0.11.2] - 2026-10-02
 
 ### Fixed
