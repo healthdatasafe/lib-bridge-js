@@ -11,6 +11,14 @@
   `--test-reporter=spec` (a Node flag, which makes mocha re-spawn with `--no-config` and so drop the config), and the
   setup file fails loudly if that happens again. CI no longer seeds a placeholder `localConfig.yml`.
 
+### Security
+
+- **Dependabot alerts cleared; `npm audit` reports 0.** `moment` 2.31.0 (GHSA-4p3w-j4w9-5jqw, via dev-boiler's
+  `winston-daily-rotate-file`) and `brace-expansion` 1.1.21 / 2.1.7 / 5.0.12 (GHSA-q2hr-2g5m-vwhr and two earlier
+  DoS advisories) in the lockfile. Dev-only: **mocha 10 → 12**, which drops `chokidar` 3 and with it `braces`
+  (GHSA-vfj7-8cjw-p6xm has no patched `braces`), and moves past the `diff` 7 of mocha 11. The lockfile is what this
+  repo's CI installs; a consuming bridge resolves these from its own lockfile.
+
 ## [0.11.3] - 2026-10-05
 
 ### Changed
