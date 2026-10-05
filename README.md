@@ -196,11 +196,17 @@ Edit `localConfig.yml` — see `config/sample-localConfig.yml` for reference.
 ## Development
 
 ```bash
-npm test                 # Run tests
+npm test                 # Run tests (uses ./localConfig.yml when present)
 npm test -- --grep=PLTX  # Run specific tests
+config=/path/to/other.yml npm test   # Run tests against another config file
 npm run test:coverage    # Coverage report
 npm run lint             # Lint
 ```
+
+The config file reaches the tests through the `config` environment key (`tests/setupConfig.ts`), not a
+`--config` argument, which mocha would take for its own rc file. Without a provisioned
+`bridgeApiEndPoint` (no `localConfig.yml`, or one still set to `OVERRIDE_ME`), the suites that need the
+live bridge account skip and the rest run.
 
 The test suite includes `SampleBridge` in `tests/sample-bridge/` — a minimal bridge that demonstrates how to use the library. It follows the same pattern as real bridges like bridge-chartneo.
 

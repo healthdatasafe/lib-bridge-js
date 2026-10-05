@@ -39,12 +39,10 @@ jobs:
       run: npm run lint
 
     # The integration tests SKIP unless a real Pryv account is provisioned
-    # (`bridgeIsConfigured()` in tests/helpers/testServer.ts). The sample config
-    # carries `bridgeApiEndPoint: OVERRIDE_ME`, which is exactly the unconfigured
-    # state, so the unit tests run and the integration ones report as pending.
-    # mocha needs the file to exist at all in order to start.
-    - name: Seed an unconfigured localConfig for the test run
-      run: cp config/sample-localConfig.yml localConfig.yml
-
+    # (`bridgeIsConfigured()` in tests/helpers/testServer.ts). CI has no
+    # localConfig.yml (gitignored), so only config/test-config.yml applies: the unit
+    # tests run and the integration ones report as pending. The test script no longer
+    # passes `--config localConfig.yml`, which mocha read as its own rc file and aborted
+    # on when the file was absent, so no placeholder file needs seeding.
     - name: Test
       run: npm test

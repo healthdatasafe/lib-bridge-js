@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`npm test` runs without a `localConfig.yml`.** The test scripts passed `-- --config localConfig.yml`, which
+  mocha took for its own rc file: it aborted with `ERR_MOCHA_UNPARSABLE_FILE` when the file was absent, and parsed
+  the bridge config as mocha options when present. `tests/setupConfig.ts` now hands the file to dev-boiler through
+  the `config` environment key (`./localConfig.yml` when present, or `config=<path> npm test`). The scripts also drop
+  `--test-reporter=spec` (a Node flag, which makes mocha re-spawn with `--no-config` and so drop the config), and the
+  setup file fails loudly if that happens again. CI no longer seeds a placeholder `localConfig.yml`.
+
 ## [0.11.3] - 2026-10-05
 
 ### Changed
