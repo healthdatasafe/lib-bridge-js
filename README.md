@@ -6,7 +6,7 @@ Each bridge is a standalone app that depends on this library. See [bridge-chartn
 
 ## What it provides
 
-- Express server with clustering, CORS, JSON parsing, error handling
+- Express server with clustering, CORS (origin allow-list in `server:corsOrigins`), JSON parsing, error handling
 - Partner authentication middleware (`partnerAuthToken` header check)
 - User onboarding flow (initiate → HDS auth → finalize → webhook)
 - Bridge account management (user credentials, sync status, error logging)

@@ -1,6 +1,24 @@
 # Changelog
 
-## [Unreleased]
+## [0.12.0] - 2026-10-05
+
+### Added
+
+- **`server:corsOrigins`: a CORS origin allow-list** (B-2026-09-24-3). `createBridgeApp` used a bare `cors()`, so
+  every bridge answered `Access-Control-Allow-Origin: *` and any web page could script calls against it and read the
+  responses. Set the key per environment (`server__corsOrigins`, a JSON array of exact https origins: the webapp,
+  account app and doctor-dashboard hosts) and only those origins get an allow header. `"*"` opens it explicitly.
+  **Unset keeps the old open behaviour** and logs a warning at boot, so upgrading does not cut the HDS apps off a
+  bridge whose environment does not list them yet. Server-to-server partner calls send no `Origin` and are not
+  affected. A bridge's own `config/default-config.yml` replaces the lib's (they are not merged), so the default
+  lives in code, not in config.
+
+### Changed
+
+- **`partnerAuthToken is NOT configured` is logged at warn, not error** (B-2026-10-05-1). The lib mounts partner
+  routes on every bridge, and bridges without a partner backend (mira, tempdrop) leave the token unset by design,
+  so the error line on every worker boot was noise that could trip log-based alerts. The fail-closed behaviour is
+  unchanged.
 
 ### Fixed
 

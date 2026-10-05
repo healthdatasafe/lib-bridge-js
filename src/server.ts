@@ -4,12 +4,12 @@ import fs from 'fs';
 import { createRequire } from 'module';
 import express from 'express';
 import type { Application } from 'express';
-import cors from 'cors';
 
 import { init as pryvServiceInit } from './lib/pryvService.ts';
 import { init as bridgeAccountInit } from './lib/bridgeAccount.ts';
 import { init as onboardInit } from './methods/onboard.ts';
 import * as checkAuth from './middlewares/checkAuth.ts';
+import { corsMiddleware } from './middlewares/cors.ts';
 import * as plugins from './lib/plugins.ts';
 import accountRouter from './routes/accountRoute.ts';
 import userRouter from './routes/userRoute.ts';
@@ -48,7 +48,8 @@ async function createBridgeApp (plugin?: PluginBridge): Promise<Application> {
 
   const newApp = express();
 
-  newApp.use(cors());
+  const config = await getConfig();
+  newApp.use(corsMiddleware(config.get('server:corsOrigins'), logger()));
   newApp.use(express.json());
 
   // Aggregate telemetry (plan 88): time every request; the emitter is built

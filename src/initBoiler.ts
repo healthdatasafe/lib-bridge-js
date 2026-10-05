@@ -28,7 +28,8 @@ export default function initBoiler (appName: string, consumerConfigDir?: string)
       }
     }
   });
-  // Use consumer's config dir if provided, with lib-bridge-js defaults as fallback
+  // Use the consumer's config dir if provided, otherwise lib-bridge-js's own. The two are
+  // NOT merged: a consumer's default-config.yml replaces the lib's entirely.
   const configDir = consumerConfigDir || bridgeConfigDir;
   const baseFilesDir = consumerConfigDir ? path.resolve(consumerConfigDir, '..') : path.resolve(import.meta.dirname, '..');
   const boiler = require('dev-boiler').init({

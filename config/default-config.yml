@@ -5,6 +5,12 @@
 server:
   port: 7432
   host: '0.0.0.0'
+  # Origins allowed to call this bridge from a browser (CORS): exact https origins, e.g.
+  # ["https://app.hds.ngo", "https://account.hds.ngo", "https://doctor-dashboard.hds.ngo"].
+  # Set per environment with `server__corsOrigins` (a JSON array). "*" opens it explicitly.
+  # Unset (null) keeps every origin open and logs a warning at boot.
+  # Note: a bridge's own config/default-config.yml replaces this file, it is not merged.
+  corsOrigins: null
 
 # Clustering
 start:

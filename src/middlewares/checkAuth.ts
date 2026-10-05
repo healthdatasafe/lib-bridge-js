@@ -14,11 +14,14 @@ async function init (): Promise<void> {
   const token = config.get<string>('partnerAuthToken');
   partnerAuthToken = (typeof token === 'string' && token.length > 0) ? token : null;
   if (partnerAuthToken === null) {
-    // Loud, because the consequence is invisible at runtime: with no token there is
+    // Logged because the consequence is invisible at runtime: with no token there is
     // no way to authenticate as the partner, so every partner-only route answers 401
     // for everyone. A bridge that actually uses those routes is broken until this is
     // configured — and that is deliberately the safe direction (see below).
-    getLogger('checkAuth').error(
+    // A warning, not an error: the library mounts partner routes on every bridge, and
+    // bridges with no partner backend (mira, tempdrop) legitimately leave it unset, so
+    // an error-level line on each worker boot was noise that could trip log alerts.
+    getLogger('checkAuth').warn(
       'partnerAuthToken is NOT configured — every partner-only route will reject all callers. ' +
       'Set `partnerAuthToken` in this bridge\'s config if it serves partner requests.'
     );
