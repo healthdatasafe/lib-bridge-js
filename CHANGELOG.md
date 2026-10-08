@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.1] - 2026-10-08
+
+### Changed
+
+- **hds-lib 2.15.1** (pryv 3.17.0, `@pryv/cmc` 3.19.0). The pryv 3.17.0 change is browser sign-in cookies only; the
+  hds-lib 2.14.x fixes are in `appTemplates` (`CollectorRequest`, `Application`), which this library does not use.
+  117 tests pass unchanged.
+
 ## [0.12.0] - 2026-10-05
 
 ### Added
