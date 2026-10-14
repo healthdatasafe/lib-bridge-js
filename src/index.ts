@@ -26,7 +26,7 @@ export { addCredentialToBridgeAccount } from './methods/user.ts';
 export { getLogger } from './lib/PluginBridge.ts';
 
 // Shared cache (cluster-safe via memored)
-export { cacheGet, cacheSet, cacheDel, initCacheLocal } from './lib/cache.ts';
+export { cacheGet, cacheSet, cacheDel, cacheTake, initCacheLocal } from './lib/cache.ts';
 
 // Durable per-user sync state, one `sync-status/bridge` event per user (plan 101 T7)
 export { SyncStateStore, SYNC_STATUS_TYPE } from './lib/syncState.ts';

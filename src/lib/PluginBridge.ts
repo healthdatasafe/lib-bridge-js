@@ -4,7 +4,7 @@ import type { Application } from 'express';
 import * as errors from '../errors/index.ts';
 import * as user from '../methods/user.ts';
 import { logSyncStatus } from './bridgeAccount.ts';
-import { cacheGet, cacheSet, cacheDel } from './cache.ts';
+import { cacheGet, cacheSet, cacheDel, cacheTake } from './cache.ts';
 
 const { getLogger: _getLogger, getConfig } = boiler;
 
@@ -139,5 +139,12 @@ export default class PluginBridge {
    */
   async cacheDel (key: string): Promise<void> {
     return cacheDel(key);
+  }
+
+  /**
+   * Read and remove a value in one step: of concurrent callers across workers, only one gets it.
+   */
+  async cacheTake<T = unknown> (key: string): Promise<T | undefined> {
+    return cacheTake<T>(key);
   }
 }

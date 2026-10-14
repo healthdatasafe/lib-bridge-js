@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.13.0] - 2026-10-14
+
+### Added
+
+- **`cacheTake(key)`: read and remove a cache entry in one step** (B-2026-10-14-8), also as `PluginBridge.cacheTake`.
+  Of several concurrent callers for the same key, across workers, exactly one gets the value and the others get
+  `undefined`. Use it for single-use entries such as an OAuth `state`: a `cacheGet` followed by `cacheDel` let two
+  callbacks carrying the same `state` both read the session before either deleted it. memored has no atomic take, so
+  in cluster mode the primary hands out a per-key lock (released after the take, expiring after 30 s if its worker
+  dies) and only the holder reads and removes the value. It needs `initCacheMaster()` in the primary, which
+  `startCluster` already calls.
+
+### Fixed
+
+- **`cacheSet(key, value, ttlMs)` honours `ttlMs` outside cluster mode** (B-2026-10-14-7). The local map stored the
+  value with no expiry, so a single-process bridge never expired its entries (bridge-tempdrop's 10-minute `state`
+  stayed valid until restart) and the map grew without bound. Entries now expire on read and a background sweep
+  (every 60 s, unref'd) purges them. A `ttlMs` of 0 still means "never expires", as memored treats it.
+
 ## [0.12.1] - 2026-10-08
 
 ### Changed
