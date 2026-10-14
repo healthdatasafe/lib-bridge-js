@@ -27,12 +27,18 @@ const REGEXP_URL = /^(https?:\/\/)?([\w-]+\.)+[\w-]+(\/[\w-]*)*$/;
  * Middleware for express to manage errors
  */
 function expressErrorHandler (err: AppError, req: Request, res: LogResponse, next: NextFunction): void {
-  expressErrorLogger().error(err.message, err);
+  const statusCode = err.statusCode || 501;
+  // A 4xx is the client's mistake (expired link, bad parameter, probe): warn, no stack, so it
+  // neither buries real failures nor trips error-level log conditions (B-2026-10-14-17).
+  if (statusCode < 500) {
+    expressErrorLogger().warn(err.message, { statusCode, errorObject: err.errorObject });
+  } else {
+    expressErrorLogger().error(err.message, err);
+  }
   if (res.headersSent) {
     next(err);
     return;
   }
-  const statusCode = err.statusCode || 501;
   res.status(statusCode);
   if (statusCode === 404) {
     res.log404 = true; // tells the logger to keep this 404 in the logs.

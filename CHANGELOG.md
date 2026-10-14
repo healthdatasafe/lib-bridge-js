@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.13.1] - 2026-10-14
+
+### Changed
+
+- **Client errors (4xx) are logged at `warn`, without the stack** (B-2026-10-14-17). `expressErrorHandler` logged every
+  error at `error` with the full error object, so an expired connect link, a bad parameter or an anonymous probe wrote
+  an error-level block in every bridge's log, burying real failures and able to trip conditions that count
+  error-level lines. A 4xx now logs its message with `{ statusCode, errorObject }` at `warn`; a 5xx, and an error
+  without a status (answered 501), stay at `error` with the error itself. The response is unchanged. Tests `[ERLA]`,
+  `[ERLB]`.
+
 ## [0.13.0] - 2026-10-14
 
 ### Added
