@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **`tools/createBridgeAccountUser` runs again** (now `.ts`). The `.js` version was CommonJS in an ES module package
+  and required a file that no longer exists, so it died at its first line; it also asked for the access with
+  `defaultName`, which open-pryv.io refuses since 2.0.0-rc.50. It now creates the bridge stream, then the app access
+  with plain permissions; `--config-dir <bridge>/config` takes the bridge's appId, platform and main stream, and
+  `--cmc` adds `manage` on `:_cmc:inbox` and `:_cmc:apps` for bridges that receive CMC grants. Credentials from
+  `BRIDGE_USER` / `BRIDGE_PASS` / `BRIDGE_EMAIL` or prompts; an existing access is kept unless `BRIDGE_REPLACE=y`.
+  Checked against demo (new account, then reuse).
+
 ## [0.13.1] - 2026-10-14
 
 ### Changed
