@@ -15,15 +15,16 @@ async function init (): Promise<void> {
   partnerAuthToken = (typeof token === 'string' && token.length > 0) ? token : null;
   if (partnerAuthToken === null) {
     // Logged because the consequence is invisible at runtime: with no token there is
-    // no way to authenticate as the partner, so every partner-only route answers 401
-    // for everyone. A bridge that actually uses those routes is broken until this is
-    // configured — and that is deliberately the safe direction (see below).
-    // A warning, not an error: the library mounts partner routes on every bridge, and
-    // bridges with no partner backend (mira, tempdrop) legitimately leave it unset, so
-    // an error-level line on each worker boot was noise that could trip log alerts.
+    // no way to authenticate as the partner, so the partner onboarding routes are not
+    // mounted (server.ts) and any other partner-only route answers 401 for everyone.
+    // A bridge that actually serves a partner is broken until this is configured — and
+    // that is deliberately the safe direction (see below).
+    // A warning, not an error: bridges with no partner backend (mira, tempdrop)
+    // legitimately leave it unset, so an error-level line on each worker boot was noise
+    // that could trip log alerts.
     getLogger('checkAuth').warn(
-      'partnerAuthToken is NOT configured — every partner-only route will reject all callers. ' +
-      'Set `partnerAuthToken` in this bridge\'s config if it serves partner requests.'
+      'partnerAuthToken is NOT configured — partner onboarding routes are not mounted and every ' +
+      'partner-only route rejects all callers. Set `partnerAuthToken` in this bridge\'s config if it serves partner requests.'
     );
   }
 }
@@ -70,4 +71,9 @@ function matchesPartnerToken (header: unknown, token: unknown): boolean {
   return header === token;
 }
 
-export { init, checkIfPartner, matchesPartnerToken };
+/** Whether `init()` found a usable `partnerAuthToken`, i.e. this bridge serves a partner backend. */
+function isPartnerConfigured (): boolean {
+  return partnerAuthToken !== null;
+}
+
+export { init, checkIfPartner, matchesPartnerToken, isPartnerConfigured };

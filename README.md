@@ -8,7 +8,7 @@ Each bridge is a standalone app that depends on this library. See [bridge-chartn
 
 - Express server with clustering, CORS (origin allow-list in `server:corsOrigins`), JSON parsing, error handling
 - Partner authentication middleware (`partnerAuthToken` header check)
-- User onboarding flow (initiate → HDS auth → finalize → webhook)
+- Partner user onboarding flow (initiate → HDS auth → finalize → webhook), mounted only when `partnerAuthToken` is configured
 - Bridge account management (user credentials, sync status, error logging)
 - `PluginBridge` base class for partner-specific logic
 - Test utilities for consumer repos
@@ -117,6 +117,12 @@ Provide a `config/` directory with:
 In production (Dokku), secrets come from environment variables — no mounted config files needed.
 
 ## Bridge API
+
+### Availability
+
+These partner routes (`/user/*`, `/account/errors`) exist only on a bridge whose config sets `partnerAuthToken`, i.e.
+a bridge with a partner backend (chartneo). Without it they are not mounted and answer 404; bridges whose users connect
+through CMC or OAuth (mira, tempdrop) do not need them.
 
 ### Authorization
 

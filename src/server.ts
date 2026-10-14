@@ -36,6 +36,23 @@ const initAsyncComponents = [
 let app: Application | null = null;
 
 /**
+ * The legacy partner-onboarding routes (`/user/*`, `/account/errors`) serve a partner backend
+ * that onboards users through the bridge and receives a webhook. Only a bridge configured with
+ * `partnerAuthToken` has one (chartneo); without it every partner-only route refuses all callers
+ * anyway, and the anonymous `GET /user/onboard/finalize/:id` was the B-2026-09-24-1 SSRF site,
+ * so nothing is mounted (B-2026-10-14-6). Returns whether the routes were mounted.
+ */
+function mountPartnerRoutes (target: Application, enabled: boolean): boolean {
+  if (!enabled) {
+    logger().info('No partnerAuthToken: partner onboarding routes (/user, /account) not mounted');
+    return false;
+  }
+  target.use('/account', accountRouter);
+  target.use('/user', userRouter);
+  return true;
+}
+
+/**
  * Create a configured Express app with the given plugin.
  * App is a singleton — subsequent calls return the same instance.
  */
@@ -72,14 +89,11 @@ async function createBridgeApp (plugin?: PluginBridge): Promise<Application> {
     res.json({ status: 'ok', name: pkg.name, version: pkg.version, ...buildInfo, uptime: Math.floor(process.uptime()) });
   });
 
-  // static ressource are temporary until handled by externall apps.
-  newApp.use('/static', express.static(path.resolve(import.meta.dirname, 'static')));
-  newApp.use('/account', accountRouter);
-  newApp.use('/user', userRouter);
+  const partnerOnboarding = mountPartnerRoutes(newApp, checkAuth.isPartnerConfigured());
 
   // init plugin, then onboard (needs plugin permissions)
   await plugins.initWithExpressApp(newApp, plugin);
-  await onboardInit();
+  if (partnerOnboarding) await onboardInit();
 
   // ------------ must be last ------- //
   newApp.use(expressErrorHandler);
@@ -119,4 +133,4 @@ async function launch (plugin?: PluginBridge): Promise<Application> {
 // Legacy alias
 const getApp = createBridgeApp;
 
-export { launch, createBridgeApp, getApp };
+export { launch, createBridgeApp, getApp, mountPartnerRoutes };

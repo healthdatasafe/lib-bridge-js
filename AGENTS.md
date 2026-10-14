@@ -32,7 +32,7 @@ This library provides the **shared scaffolding**:
 
 - HTTP server (Express + cluster + CORS + error handling).
 - Partner-auth middleware (`partnerAuthToken` header check).
-- The user onboarding flow (initiate → HDS auth → finalize → optional partner webhook).
+- The partner user onboarding flow (initiate → HDS auth → finalize → optional partner webhook), mounted only when `partnerAuthToken` is configured (`mountPartnerRoutes` in `src/server.ts`).
 - A `PluginBridge` base class that each partner-specific bridge extends.
 - Test utilities (`testServer`) for consumer-side integration tests.
 
@@ -112,9 +112,9 @@ Use the boiler-provided logger (via `getLogger`), not `console.log`. The logger 
 
 ## Onboarding flow — quick recap
 
-The handshake spans 3 actors: **partner** (their server), **bridge** (this code + plugin), and **HDS** (Pryv account). The full sequence is in [doc/onboarding-flow-detail.md](doc/onboarding-flow-detail.md). Headline beats:
+Only for a bridge with a partner backend (`partnerAuthToken` set; today chartneo): elsewhere the routes are not mounted, and users connect through CMC or the partner's OAuth instead. The handshake spans 3 actors: **partner** (their server), **bridge** (this code + plugin), and **HDS** (Pryv account). The full sequence is in [doc/onboarding-flow-detail.md](doc/onboarding-flow-detail.md). Headline beats:
 
-1. **Partner → bridge** `POST /onboarding/initiate` with `partnerUserId` + `partnerAuthToken`. Bridge issues a one-time HDS auth request and returns a redirect URL.
+1. **Partner → bridge** `POST /user/onboard` with `partnerUserId` + `partnerAuthToken`. Bridge issues a one-time HDS auth request and returns a redirect URL.
 2. **User → HDS** authenticates in their browser, grants the bridge access, returns to the bridge's redirect URL with a Pryv API endpoint.
 3. **Bridge → partner** webhook (configured per-partner) confirming the new association.
 4. **Bridge** stores `{partnerUserId → bridgeAccount}` and starts whatever periodic sync the plugin defines.

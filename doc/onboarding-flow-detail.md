@@ -1,6 +1,8 @@
 
 ### Onboarding Detailed Flow 
 
+Applies only to a bridge with a partner backend: the routes are mounted only when `partnerAuthToken` is configured.
+
 Case user does not exist
 
 ```mermaid

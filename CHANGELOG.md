@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.14.0] - 2026-10-14
+
+### Changed
+
+- **The partner onboarding routes are mounted only on a bridge with a partner backend** (B-2026-10-14-6).
+  `/user/*` (onboard, finalize, status, list of apiEndpoints) and `/account/errors` were mounted on every bridge,
+  and `onboardInit` ran at every boot, although only a bridge configured with `partnerAuthToken` can use them
+  (today chartneo). Without the token every partner-only route already refused all callers, but the anonymous
+  `GET /user/onboard/finalize/:id` stayed reachable (the B-2026-09-24-1 SSRF site). Now, with no `partnerAuthToken`,
+  none of them is mounted (404) and `onboardInit` is skipped; with it, nothing changes. Prod nginx logs (2026-09-30 to
+  2026-10-14) show no caller other than our own fix verification. New `mountPartnerRoutes` (`server.ts`) and
+  `isPartnerConfigured` (`checkAuth.ts`). Tests `[PRMA]`, `[PRMB]`.
+  **Upgrading a bridge that serves a partner:** keep `partnerAuthToken` set. Bridges without one (mira, tempdrop) lose
+  nothing they use; their `newUserAssociated` override is only reachable through finalize.
+
+### Removed
+
+- `/static/onboardPatientByCareGiver.html` and `onboardPatientByCaregiverDispatch.html`. They were never served by a
+  built bridge (`src/static` is not copied to `dist/`), nothing linked to them, and the form posted to
+  `/user/onboard` without the partner token or the fields the route expects.
+
 ## [Unreleased]
 
 ### Fixed
