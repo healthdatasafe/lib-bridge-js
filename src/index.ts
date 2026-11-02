@@ -12,6 +12,10 @@ export * as errors from './errors/index.ts';
 export { observabilityTiming, initBridgeObservability } from './lib/observability.ts';
 export type { ObsHolder } from './lib/observability.ts';
 
+// Crash-loop detection, for standalone services that run their own cluster primary
+// (startCluster is bound to createBridgeApp and a bridge account), e.g. hds-support-service.
+export { createCrashLoopMonitor, CRASH_LOOP_DEFAULTS } from './lib/crashLoopMonitor.ts';
+
 // Re-export essentials for consumers
 export { initHDSModel, getHDSModel, pryv } from 'hds-lib';
 export { default as Router } from 'express-promise-router';

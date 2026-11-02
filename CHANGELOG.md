@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.15.0] - 2026-11-02
+
+### Added
+
+- **`createCrashLoopMonitor` and `CRASH_LOOP_DEFAULTS` are exported from the package index**, for standalone
+  services that run their own cluster primary (`startCluster` is bound to `createBridgeApp` and a bridge account).
+  `hds-support-service` (plan 117) imported them from `dist/src/lib/crashLoopMonitor.js`, which would break silently
+  on any internal move.
+
 ## [0.14.0] - 2026-10-14
 
 ### Changed
