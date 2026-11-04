@@ -53,7 +53,17 @@ async function init (): Promise<void> {
   // check that access has "manage" on the bridge's main stream — Pryv may
   // inject other permissions (e.g. ":_system:account") at arbitrary indices,
   // so search the list rather than relying on permissions[0].
-  const info = await _bridgeConnection.accessInfo();
+  // Since pryv 3.18.0 accessInfo() rejects a refused token (pryv/lib-js#80).
+  let info: Awaited<ReturnType<typeof _bridgeConnection.accessInfo>>;
+  try {
+    info = await _bridgeConnection.accessInfo();
+  } catch (e) {
+    // Host only: the apiEndpoint embeds the bridge's token.
+    internalError('Bridge connection failed — invalid apiEndpoint', {
+      host: new URL(bridgeApiEndPoint).host,
+      id: (e as { innerObject?: { id?: string } }).innerObject?.id
+    });
+  }
   const hasManage = info?.permissions?.some(
     (p: { streamId?: string, level?: string }) =>
       p.streamId === settings.mainStreamId && p.level === 'manage'
