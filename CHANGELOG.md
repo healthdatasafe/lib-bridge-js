@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.16.0] - 2026-11-04
+
+### Changed
+
+- **hds-lib 2.40.0** (from 2.16.2), so `pryv` 3.18.0 and `@pryv/cmc` 3.23.0. Since pryv 3.18.0
+  `Connection#accessInfo()` rejects a refused token instead of resolving `{ error }` (pryv/lib-js#80).
+  `bridgeAccount.init` now catches it and fails with `Internal Error: Bridge connection failed — invalid apiEndpoint`
+  (host and core error id only, never the apiEndpoint, which embeds the token). Before, a refused bridge token
+  reported the missing `manage` permission.
+
 ## [0.15.0] - 2026-11-02
 
 ### Added
