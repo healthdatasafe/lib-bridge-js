@@ -62,7 +62,7 @@ describe('[OBS] observability middleware', () => {
       [502, 'UPSTREAM_ERROR'], [503, 'UPSTREAM_ERROR'], [504, 'UPSTREAM_ERROR'],
       [500, 'INTERNAL_ERROR'], [501, 'INTERNAL_ERROR'], [505, 'INTERNAL_ERROR'],
       [400, 'BAD_REQUEST'], [403, 'FORBIDDEN'], [404, 'NOT_FOUND'], [409, 'CONFLICT'],
-      [422, 'UPSTREAM_ERROR']
+      [405, 'BAD_REQUEST'], [413, 'BAD_REQUEST'], [422, 'BAD_REQUEST']
     ];
     for (const [status, code] of expected) {
       const calls: Array<[string, string]> = []; const errs: string[] = [];

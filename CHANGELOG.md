@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.2] - 2026-11-05
+
+### Fixed
+
+- **Other 4xx count as `BAD_REQUEST`** (B-2026-11-05-9). A 4xx without its own code (405, 413, 415, 422…) was
+  labelled `UPSTREAM_ERROR`, so a malformed client request looked like a dependency failure in `hds.errors`.
+  `UPSTREAM_ERROR` now means only 502/503/504.
+
 ## [0.16.1] - 2026-11-05
 
 ### Fixed
