@@ -45,7 +45,8 @@ function statusClassOf (code: number): StatusClass {
 /**
  * 429 is a rate limit, not a failure of anything; 502/503/504 mean a dependency
  * (Pryv core, partner API) is down or timing out, not a bug of the bridge.
- * Every other 5xx is the bridge's own. (B-2026-11-02-7)
+ * Every other 5xx is the bridge's own. (B-2026-11-02-7) Any other 4xx (405, 413,
+ * 422…) is the caller's request, not a dependency failure. (B-2026-11-05-9)
  */
 function errorCodeOf (code: number): FrameworkErrorCode {
   switch (code) {
@@ -56,7 +57,7 @@ function errorCodeOf (code: number): FrameworkErrorCode {
     case 409: return 'CONFLICT';
     case 429: return 'RATE_LIMITED';
     case 502: case 503: case 504: return 'UPSTREAM_ERROR';
-    default: return code >= 500 ? 'INTERNAL_ERROR' : 'UPSTREAM_ERROR';
+    default: return code >= 500 ? 'INTERNAL_ERROR' : 'BAD_REQUEST';
   }
 }
 
