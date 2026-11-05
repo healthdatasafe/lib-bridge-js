@@ -26,7 +26,7 @@ import {
 /** Closed set of framework-level error codes, derived from HTTP status. */
 const FRAMEWORK_ERROR_CODES = [
   'UNAUTHORIZED', 'FORBIDDEN', 'BAD_REQUEST', 'NOT_FOUND',
-  'CONFLICT', 'UPSTREAM_ERROR', 'INTERNAL_ERROR'
+  'CONFLICT', 'RATE_LIMITED', 'UPSTREAM_ERROR', 'INTERNAL_ERROR'
 ] as const;
 type FrameworkErrorCode = (typeof FRAMEWORK_ERROR_CODES)[number];
 
@@ -42,6 +42,11 @@ function statusClassOf (code: number): StatusClass {
   return (c >= 2 && c <= 5) ? (`${c}xx` as StatusClass) : 'error';
 }
 
+/**
+ * 429 is a rate limit, not a failure of anything; 502/503/504 mean a dependency
+ * (Pryv core, partner API) is down or timing out, not a bug of the bridge.
+ * Every other 5xx is the bridge's own. (B-2026-11-02-7)
+ */
 function errorCodeOf (code: number): FrameworkErrorCode {
   switch (code) {
     case 401: return 'UNAUTHORIZED';
@@ -49,6 +54,8 @@ function errorCodeOf (code: number): FrameworkErrorCode {
     case 400: return 'BAD_REQUEST';
     case 404: return 'NOT_FOUND';
     case 409: return 'CONFLICT';
+    case 429: return 'RATE_LIMITED';
+    case 502: case 503: case 504: return 'UPSTREAM_ERROR';
     default: return code >= 500 ? 'INTERNAL_ERROR' : 'UPSTREAM_ERROR';
   }
 }

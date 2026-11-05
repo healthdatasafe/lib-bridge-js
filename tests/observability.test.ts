@@ -56,6 +56,24 @@ describe('[OBS] observability middleware', () => {
     assert.equal(errs[0], 'UNAUTHORIZED');
   });
 
+  it('maps 429 to RATE_LIMITED, 502/503/504 to UPSTREAM_ERROR, other 5xx to INTERNAL_ERROR (B-2026-11-02-7)', async () => {
+    const expected: Array<[number, string]> = [
+      [429, 'RATE_LIMITED'],
+      [502, 'UPSTREAM_ERROR'], [503, 'UPSTREAM_ERROR'], [504, 'UPSTREAM_ERROR'],
+      [500, 'INTERNAL_ERROR'], [501, 'INTERNAL_ERROR'], [505, 'INTERNAL_ERROR'],
+      [400, 'BAD_REQUEST'], [403, 'FORBIDDEN'], [404, 'NOT_FOUND'], [409, 'CONFLICT'],
+      [422, 'UPSTREAM_ERROR']
+    ];
+    for (const [status, code] of expected) {
+      const calls: Array<[string, string]> = []; const errs: string[] = [];
+      await run(
+        { method: 'GET', baseUrl: '', route: { path: '/status' } as Request['route'] },
+        fakeRes(status), stubHolder(calls, errs)
+      );
+      assert.deepEqual(errs, [code], `status ${status}`);
+    }
+  });
+
   it('keeps the mount prefix on an ERRORED mounted request (baseUrl already unwound)', async () => {
     const calls: Array<[string, string]> = [];
     // Express restores req.baseUrl to '' while unwinding a router to reach the app-level
