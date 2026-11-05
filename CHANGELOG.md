@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.16.1] - 2026-11-05
+
+### Fixed
+
+- **`hds.errors` codes for 429 and 502/503/504** (B-2026-11-02-7). The telemetry middleware labelled a 429 as
+  `UPSTREAM_ERROR` and a 502, 503 or 504 as `INTERNAL_ERROR`, so a rate limit looked like an upstream failure and a
+  Pryv core or partner outage looked like a bridge bug. A 429 now counts as the new code `RATE_LIMITED`, and
+  502/503/504 as `UPSTREAM_ERROR`; 500 and every other 5xx stay `INTERNAL_ERROR`. `hds.calls` is unchanged (still
+  `status_class` `4xx` / `5xx`), so the 5xx error-rate alert is unaffected; only `hds.errors` queries faceted by `code`
+  read differently.
+
 ## [0.16.0] - 2026-11-04
 
 ### Changed
@@ -39,8 +50,6 @@
 - `/static/onboardPatientByCareGiver.html` and `onboardPatientByCaregiverDispatch.html`. They were never served by a
   built bridge (`src/static` is not copied to `dist/`), nothing linked to them, and the form posted to
   `/user/onboard` without the partner token or the fields the route expects.
-
-## [Unreleased]
 
 ### Fixed
 
