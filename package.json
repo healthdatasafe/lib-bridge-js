@@ -55,5 +55,11 @@
   },
   "overrides": {
     "serialize-javascript": "^7.0.5"
+  },
+  "allowScripts": {
+    "github:healthdatasafe/dev-newrelic-scrub": true,
+    "github:healthdatasafe/hds-lib-js": true,
+    "github:healthdatasafe/hds-observability-js": true,
+    "github:perki/backloop.dev-node": true
   }
 }
