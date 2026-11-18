@@ -236,3 +236,7 @@ package that moved from the registry to a git URL: it leaves the old directory i
 ```sh
 rm -rf node_modules/backloop.dev && npm install
 ```
+
+## License
+
+[BSD-3-Clause](LICENSE)

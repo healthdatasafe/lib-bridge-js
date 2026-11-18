@@ -24,9 +24,10 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "lint:change": "eslint $(git diff --name-only HEAD | grep -E '\\.(ts|tsx)$' | xargs)",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "license": "source-licenser -c .licenser.yml ."
   },
-  "author": "Health Data Safe",
+  "author": "Health Data Safe (https://www.healthdatasafe.org)",
   "license": "BSD-3-Clause",
   "dependencies": {
     "backloop.dev": "git+https://github.com/perki/backloop.dev-node.git#v5.2.1",
@@ -49,6 +50,7 @@
     "eslint": "^9.0.0",
     "mocha": "^12.0.3",
     "neostandard": "^0.12.0",
+    "source-licenser": "^2.0.6",
     "supertest": "^7.0.0",
     "supertest-session": "^5.0.1",
     "typescript": "^5.9.3"
