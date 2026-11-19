@@ -21,10 +21,20 @@ export function levelContains (want: string, held: string): boolean {
   return want === 'contribute' && (held === 'read' || held === 'create-only');
 }
 
+/**
+ * The permissions a person grants: `personPermissions` (no `:_cmc:*`) without the platform's
+ * other `:_` streams. Access-info lists ones the core adds to every access
+ * (`:_system:account` at `none`, `:_audit:access-<id>`): they are not part of the grant and
+ * must not be sent back in a scope request (hds-lib `isDataStream` draws the same line).
+ */
+export function dataPermissions (perms: ScopePermission[]): ScopePermission[] {
+  return cmcScope.personPermissions(perms).filter(p => p.streamId == null || !p.streamId.startsWith(':_'));
+}
+
 /** `current ∪ add` by streamId, no parent folding; refuses a level that does not contain the held one. */
 export function unionPermissions (current: ScopePermission[], add: ScopePermission[]): ScopePermission[] {
-  const out = cmcScope.personPermissions(current);
-  for (const a of cmcScope.personPermissions(add)) {
+  const out = dataPermissions(current);
+  for (const a of dataPermissions(add)) {
     if (a.streamId == null) {
       const i = out.findIndex(p => p.streamId == null && p.feature === a.feature);
       if (i < 0) out.push(a); else out[i] = a;
@@ -127,7 +137,7 @@ export async function widen (ctx: Ctx, userKey: string, add: ScopePermission[], 
 
 export async function replace (ctx: Ctx, userKey: string, full: ScopePermission[], opts: ScopeOptions = {}): Promise<PendingScopeRequest> {
   return await propose(ctx, userKey, opts, async (entry) => {
-    const permissions = cmcScope.personPermissions(full);
+    const permissions = dataPermissions(full);
     return { kind: 'plain', permissions, send: plainSender(ctx, entry, permissions, opts) };
   });
 }
@@ -183,7 +193,7 @@ async function checkAnswer (ctx: Ctx, seen: Entry): Promise<void> {
       return null;
     }
     const ai = await readAccessInfo(ctx.connectionFor(entry.apiEndpoint));
-    if (ai.state === 'live') entry.record.grantedPermissions = cmcScope.personPermissions(ai.info.permissions ?? []);
+    if (ai.state === 'live') entry.record.grantedPermissions = dataPermissions(ai.info.permissions ?? []);
     entry.record.pendingScopeRequest = null;
     await saveEntry(entry);
     return entry;

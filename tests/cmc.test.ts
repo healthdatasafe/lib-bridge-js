@@ -8,7 +8,7 @@ import { getCredentialEvent } from '../src/methods/user.ts';
 import { cacheDel, cacheLock, cacheUnlock } from '../src/lib/cache.ts';
 import { setTelemetryHolderForTests, CMC_METHOD_IDS, CMC_ERROR_CODES } from '../src/lib/observability.ts';
 import { createCmcRelationships, _testInternals } from '../src/cmc/index.ts';
-import { unionPermissions, levelContains } from '../src/cmc/scope.ts';
+import { unionPermissions, levelContains, dataPermissions } from '../src/cmc/scope.ts';
 import { withLease } from '../src/cmc/context.ts';
 import { teardownLocked } from '../src/cmc/revoke.ts';
 import type { CmcHooks, CmcRelationships, CmcRelationshipsOptions } from '../src/cmc/types.ts';
@@ -477,12 +477,17 @@ describe('[CMC] CMC relationship module', function () {
   // ---- scope ---- //
 
   it('[CMPA] widen set algebra and level conflicts', () => {
-    const cur = [{ streamId: 'inbox', level: 'read' }, { streamId: 'values', level: 'create-only' }, { streamId: ':_cmc:inbox', level: 'create-only' }];
+    // access-info also lists the platform streams the core adds to every access (seen live on demo)
+    const cur = [{ streamId: ':_system:account', level: 'none' }, { streamId: 'inbox', level: 'read' }, { streamId: ':_audit:access-a1', level: 'read' },
+      { streamId: 'values', level: 'create-only' }, { streamId: ':_cmc:inbox', level: 'create-only' }];
     assert.deepEqual(unionPermissions(cur, [{ streamId: 'dialogue', level: 'contribute' }, { streamId: 'inbox', level: 'read' }]), [
       { streamId: 'inbox', level: 'read' }, { streamId: 'values', level: 'create-only' }, { streamId: 'dialogue', level: 'contribute' }
     ]);
     assert.deepEqual(unionPermissions(cur, [{ streamId: 'inbox', level: 'contribute' }])[0], { streamId: 'inbox', level: 'contribute' });
     assert.deepEqual(unionPermissions(cur, [{ streamId: 'values', level: 'manage' }])[1], { streamId: 'values', level: 'manage' });
+    assert.deepEqual(dataPermissions([...cur, { feature: 'selfRevoke', setting: 'forbidden' }]), [
+      { streamId: 'inbox', level: 'read' }, { streamId: 'values', level: 'create-only' }, { feature: 'selfRevoke', setting: 'forbidden' }
+    ]);
     assert.throws(() => unionPermissions(cur, [{ streamId: 'values', level: 'read' }]), (e: any) => e.id === 'scope-level-conflict');
     assert.throws(() => unionPermissions(cur, [{ streamId: 'inbox', level: 'create-only' }]), (e: any) => e.id === 'scope-level-conflict');
     assert.throws(() => unionPermissions([{ streamId: 's', level: 'manage' }], [{ streamId: 's', level: 'read' }]), (e: any) => e.id === 'scope-level-conflict');

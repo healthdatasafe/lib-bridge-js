@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.17.0] - 2026-11-19
+
+### Added
+
+- **CMC relationship module** (plan 129): `createCmcRelationships({ hooks, ... })`, started from
+  `PluginBridge.init`, runs the collector side of CMC relationships for a bridge: invites (expected username checked
+  at accept), accept arrivals read from `:_cmc:inbox` by a persisted cursor with a retry list, identity taken from
+  the grant's access-info and the invite cross-checked by its server-stamped back-channel (never the accept's `from`
+  or `inviteEventId`), wrong-person / foreign-host / unknown-invite accepts refused (alert, then revoke), revocation
+  confirmed by access-info before teardown, scope updates as full sets with one open request per relationship, a
+  scoped webhook per relationship plus reconciliation, owned leases per relationship, connector status and system
+  alerts. Hooks: `onAccepted`, `onChange`, `onScopeAnswer`, `onRevoked` (required). Config block `cmc:`
+  (`enabled: false` by default). The record rides on the credential event as `clientData.hdsCmc`; no data-model
+  change. Fixes, for bridges that adopt it, B-2026-11-18-11 to -14. See README § "CMC relationships".
+- **Primitives** used by the module, exported: `cacheLock` / `cacheRenew` / `cacheUnlock` (leases with an owner
+  token), `getCredentialEvent`, `deleteCredentialFromBridgeAccount` and a `clientData` option on
+  `addCredentialToBridgeAccount`, `grantState` / `refusalId`, `getCmcStreamId` / `isValidCmcUserKey`, a `streamId`
+  option on `SyncStateStore`, `bridgeTelemetry` with the closed sets `CMC_METHOD_IDS` / `CMC_ERROR_CODES`, and
+  `PluginBridge.observabilityMethods` / `observabilityErrors` for a plugin's own telemetry ids. `{main}-cmc` is
+  created with the base streams when `cmc:enabled`.
+- Live tests against a real core (`tests/cmcLive.test.ts`, `CMC_LIVE=1`, demo only).
+
+### Changed
+
+- **hds-lib 2.57.0** (from 2.40.0).
+
+### Fixed
+
+- **`setStatus` read the error of the wrong call** (`resultFromBC[1]` of a one-call batch), so a failing status
+  lookup went unreported.
+
 ## [0.16.2] - 2026-11-05
 
 ### Fixed

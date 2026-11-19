@@ -7,7 +7,7 @@
  * A re-accept by the same person swaps the credential and sends NO revoke: a CMC revoke names the
  * shared back-channel and would sweep the new grant too (open-pryv.io `handleIncomingRevoke`).
  */
-import { cmc, cmcScope } from 'hds-lib';
+import { cmc } from 'hds-lib';
 import { readAccessInfo } from '../lib/grantState.ts';
 import { isValidCmcUserKey } from '../lib/bridgeAccount.ts';
 import {
@@ -16,6 +16,7 @@ import {
 } from './context.ts';
 import { teardownLocked } from './revoke.ts';
 import { createWebhook } from './webhook.ts';
+import { dataPermissions } from './scope.ts';
 import { publishStatus, sendAlert } from './status.ts';
 import type { CmcRelationshipRecord } from './types.ts';
 
@@ -88,7 +89,7 @@ async function verify (ctx: Ctx, event: any): Promise<Verified | 'skip' | 'retry
     username,
     host: from.host,
     dataGrantAccessId,
-    grantedPermissions: cmcScope.personPermissions(ai.info.permissions ?? []),
+    grantedPermissions: dataPermissions(ai.info.permissions ?? []),
     inviteEventId,
     acceptEventId: typeof c.acceptEventId === 'string' ? c.acceptEventId : null
   };

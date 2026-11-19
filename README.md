@@ -178,12 +178,64 @@ The partner webhook is called on onboarding success, cancel, or error. Configure
 
 Parameters sent: `type` (SUCCESS/CANCEL/ERROR), `partnerUserId`, `onboardingSecret`, `clientData` values, `pluginResultJSON` (on success).
 
+## CMC relationships
+
+For a bridge that collects data through CMC relationships (the person accepts an invite in the HDS app) instead of
+the partner onboarding flow. Partner bridges are untouched.
+
+**Enable** with config `cmc:enabled: true` (creates the `{main}-cmc` stream that holds the inbox cursor; `start()`
+refuses without it). `service:apiEndpointHostPattern` must name the platform's domain (null refuses every accept) and
+`service:patientAppBaseUrl` the HDS app. Other keys and their defaults are in `config/default-config.yml` § `cmc:`
+(app code, invite expiry and features, inbox interval and lag, scope poll, reconciliation, lease TTL, webhooks).
+
+**Start it from `PluginBridge.init`**, before the lib collects route patterns for telemetry (plugin init already runs
+first):
+
+```typescript
+import { createCmcRelationships, type CmcRelationships } from 'lib-bridge-js';
+
+override async init (app: Application, bridgeConnectionGetter: () => unknown) {
+  await super.init(app, bridgeConnectionGetter);
+  this.cmc = createCmcRelationships({
+    appCode: 'hds-bridge-reader',                 // → :_cmc:apps:hds-bridge-reader
+    hooks: {
+      requestedPermissions: () => [{ streamId: 'hds-reader-inbox', level: 'read' }],
+      onAccepted: async (rel, { replaced }) => { /* first sync, or new grant for the same person */ },
+      onChange: async (rel, { reason, modifiedSince }) => { queue.add(rel.userKey, modifiedSince); },
+      onScopeAnswer: async (rel, { answer, permissions }) => { /* ... */ },
+      onRevoked: async (rel, reason) => { /* drop the person's queue and state */ } // required
+    }
+  });
+  await this.cmc.start(app);
+}
+```
+
+Then `cmc.createInvite({ expectedUsername })` → `{ inviteEventId, capabilityUrl, patientUrl }`; `cmc.get(userKey)` →
+the relationship (`record`, `connection()` over the data grant, `scope.widen / replace / requestDataSet`, `status`,
+`sendSystemAlert`); `ensureLive`, `firstConnectAllowed`, `reportAccessError` (after a `forbidden` /
+`invalid-access-token` from a write), `revoke`. Storage is keyed per person (`userKey`, default the slug of the
+verified username and host): the credential event of `{main}-users-{userKey}` with the record as
+`clientData.hdsCmc`.
+
+- **`onChange` must be short and idempotent**: enqueue and return. It runs under the relationship's lease, may be
+  coalesced and called again (`reason: 'again'`), and long work belongs to the plugin's own queue.
+- `onAccepted` that throws is retried by reconciliation; `onRevoked` that throws keeps the record live and is
+  retried. A re-accept by the same person swaps the grant (`replaced: true`) and never calls `onRevoked`.
+- The inbox, scope-answer and reconciliation loops run on the scheduler worker only.
+- **Webhooks** (`cmc:webhooks:enabled` + a public `publicBaseUrl`, and a `webhookScopes` hook) mount
+  `POST /cmc/hook/:hookId`. The core refuses private hosts, so **local development runs poll-only** (webhooks off):
+  reconciliation polls every `cmc:reconcile:intervalS`.
+- **Never an apiEndpoint in logs or telemetry**: the module logs user keys and relationship ids only, records
+  telemetry through the closed sets `CMC_METHOD_IDS` / `CMC_ERROR_CODES`, and `connection()` is the only way to the
+  grant. Keep it so in hooks.
+
 ## Storage
 
 The bridge uses a dedicated HDS account for storage. Under the root stream (`service.bridgeAccountMainStreamId`, default "bridge"):
 - `bridge-users` → `bridge-user-{partnerUserId}` — per-user credentials and auth requests
 - `bridge-users-active` — tags active user credentials
 - `bridge-errors` — onboarding error log
+- `bridge-cmc` — CMC inbox cursor (only with `cmc:enabled`)
 
 ## Prerequisites
 
@@ -213,6 +265,13 @@ The config file reaches the tests through the `config` environment key (`tests/s
 `--config` argument, which mocha would take for its own rc file. Without a provisioned
 `bridgeApiEndPoint` (no `localConfig.yml`, or one still set to `OVERRIDE_ME`), the suites that need the
 live bridge account skip and the rest run.
+
+The CMC live suite (`tests/cmcLive.test.ts`) creates its own throwaway bridge and person accounts on the configured
+platform, and runs only on a test platform (demo or a local core) when `CMC_LIVE=1` or a bridge account is configured:
+
+```bash
+CMC_LIVE=1 npm test -- --grep LCM
+```
 
 The test suite includes `SampleBridge` in `tests/sample-bridge/` — a minimal bridge that demonstrates how to use the library. It follows the same pattern as real bridges like bridge-chartneo.
 
