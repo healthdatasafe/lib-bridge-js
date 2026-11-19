@@ -150,7 +150,7 @@ describe('[CSTX] connector status — nextConnectorStatus (pure)', () => {
   });
 });
 
-describe('[CSTX] connector status — read / publish / record', () => {
+describe('[CSTY] connector status — read / publish / record', () => {
   it('[CSPA] read returns null on an empty leaf', async () => {
     assert.equal(await readConnectorStatus(new FakeUserConn(), LEAF), null);
   });

@@ -92,7 +92,7 @@ describe('[CCHK] leases in local mode', function () {
     await cacheUnlock('cchk-j', token!);
   });
 
-  it('[CCHL] a non-positive ttlMs is refused', async () => {
+  it('[CCHT] a non-positive ttlMs is refused', async () => {
     await assert.rejects(() => cacheLock('cchk-l', 0));
     await assert.rejects(() => cacheRenew('cchk-l', 'x', -1));
   });
