@@ -100,7 +100,10 @@ async function createBridgeApp (plugin?: PluginBridge): Promise<Application> {
 
   // Routes (incl. plugin routes) are all registered now — build the emitter
   // from their patterns. No-op when no collector endpoint is configured.
-  await initBridgeObservability(newApp, pkg, obsHolder);
+  await initBridgeObservability(newApp, pkg, obsHolder, {
+    methods: plugin?.observabilityMethods,
+    errorCodes: plugin?.observabilityErrors
+  });
 
   app = newApp;
   return app;

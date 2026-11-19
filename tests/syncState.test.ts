@@ -175,6 +175,36 @@ describe('[SYST] SyncStateStore', () => {
     assert.deepEqual(await store.get('bob'), { a: 3 });
   });
 
+  it('[SYSM] a fixed streamId writes there, without creating a stream', async () => {
+    const conn = new FakeConn();
+    conn.streams.add('main-cmc');
+    const store = new SyncStateStore<any>({ connection: () => conn, mainStreamId: () => 'main', streamId: 'main-cmc' });
+    assert.equal(store.streamIdFor('cursor'), 'main-cmc');
+    await store.patch('cursor', { cursor: 10 });
+    await store.patch('cursor', { cursor: 20 });
+    const events = conn.of(SYNC_STATUS_TYPE);
+    assert.equal(events.length, 1);
+    assert.deepEqual(events[0]!.streamIds, ['main-cmc']);
+    assert.deepEqual(await store.get('cursor'), { cursor: 20 });
+    assert.ok(!conn.streams.has('main-users-cursor'));
+  });
+
+  it('[SYSN] a missing fixed stream is not created: the write fails (null)', async () => {
+    const conn = new FakeConn();
+    const store = new SyncStateStore<any>({ connection: () => conn, mainStreamId: () => 'main', streamId: 'main-cmc' });
+    assert.equal(await store.patch('cursor', { cursor: 1 }), null);
+    assert.ok(!conn.streams.has('main-cmc'));
+  });
+
+  it('[SYSO] a streamId function maps each key to its stream', async () => {
+    const conn = new FakeConn();
+    conn.streams.add('x-alice');
+    const store = new SyncStateStore<any>({ connection: () => conn, mainStreamId: () => 'main', streamId: (k) => `x-${k}` });
+    await store.patch('alice', { a: 1 });
+    assert.deepEqual(conn.of(SYNC_STATUS_TYPE)[0]!.streamIds, ['x-alice']);
+    assert.equal(makeStore(conn).streamIdFor('alice'), 'main-users-alice', 'default unchanged');
+  });
+
   it('[SYSK] getEvent exposes the event time', async () => {
     const conn = new FakeConn();
     await makeStore(conn).patch('alice', { a: 1 }, {}, 77);

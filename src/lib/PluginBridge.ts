@@ -36,6 +36,19 @@ export default class PluginBridge {
   }
 
   /**
+   * Extra telemetry method ids this plugin records through `bridgeTelemetry.recordCall`
+   * (constants only, e.g. `mira:sync`), added to the closed set at boot.
+   */
+  get observabilityMethods (): readonly string[] {
+    return [];
+  }
+
+  /** Extra telemetry error codes this plugin records through `bridgeTelemetry.recordError`. */
+  get observabilityErrors (): readonly string[] {
+    return [];
+  }
+
+  /**
    * private instance of config
    */
   #config: Config | null = null;

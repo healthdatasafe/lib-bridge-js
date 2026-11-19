@@ -46,10 +46,7 @@ async function init (): Promise<void> {
   const config = await getConfig();
   const bridgeApiEndPoint = config.get<string>('bridgeApiEndPoint');
   _bridgeConnection = new Connection(bridgeApiEndPoint);
-  settings.mainStreamId = config.get<string>('service:bridgeAccountMainStreamId');
-  settings.userParentStreamId = settings.mainStreamId + PARENT_USER_STREAM_SUFFIX;
-  settings.activeUsersStreamId = settings.userParentStreamId + '-active';
-  settings.errorStreamId = settings.mainStreamId + '-errors';
+  applyMainStreamId(config.get<string>('service:bridgeAccountMainStreamId'));
   // check that access has "manage" on the bridge's main stream — Pryv may
   // inject other permissions (e.g. ":_system:account") at arbitrary indices,
   // so search the list rather than relying on permissions[0].
@@ -74,6 +71,28 @@ async function init (): Promise<void> {
   await ensureBaseStreams();
 }
 
+function applyMainStreamId (mainStreamId: string): void {
+  settings.mainStreamId = mainStreamId;
+  settings.userParentStreamId = mainStreamId + PARENT_USER_STREAM_SUFFIX;
+  settings.activeUsersStreamId = settings.userParentStreamId + '-active';
+  settings.errorStreamId = mainStreamId + '-errors';
+}
+
+/**
+ * Tests only: use `connection` as the bridge account (no access check, no base streams).
+ * Returns a function restoring the previous state, so live suites in the same run still init.
+ */
+function _initForTests (connection: unknown, mainStreamId: string): () => void {
+  const prevConnection = _bridgeConnection;
+  const prevSettings = { ...settings };
+  _bridgeConnection = connection as InstanceType<typeof Connection>;
+  applyMainStreamId(mainStreamId);
+  return () => {
+    _bridgeConnection = prevConnection;
+    Object.assign(settings, prevSettings);
+  };
+}
+
 /**
  * Util to get the streamId of active users
  */
@@ -96,6 +115,28 @@ function streamIdForUserId (partnerUserId: string): string {
   return settings.userParentStreamId + '-' + partnerUserId;
 }
 
+/** `{main}-cmc`: the CMC module's own stream (inbox cursor), created when `cmc:enabled`. */
+function getCmcStreamId (): string {
+  if (settings.mainStreamId == null) throw new Error('Init bridgeAccount first');
+  return settings.mainStreamId + '-cmc';
+}
+
+/** Pryv's stream-id rule at creation (open-pryv.io `schema/streamId.ts`: `^[a-z0-9-]{1,100}$`). */
+const PRYV_STREAM_ID_MAX_LENGTH = 100;
+
+/**
+ * Is `key` usable as a CMC `userKey`, i.e. does `{main}-users-{key}` make a stream id the core
+ * keeps as given? `[a-z0-9-]`, starting with a letter or digit, short enough for the prefix, and
+ * not `active` (which would be the active-users stream). The CMC path only: partner bridges'
+ * `partnerUserId`s are not checked. `mainStreamId` defaults to the configured one.
+ */
+function isValidCmcUserKey (key: unknown, mainStreamId: string | null = settings.mainStreamId): boolean {
+  if (mainStreamId == null) throw new Error('isValidCmcUserKey: init bridgeAccount first or pass mainStreamId');
+  if (typeof key !== 'string' || key === 'active') return false;
+  const maxLength = PRYV_STREAM_ID_MAX_LENGTH - (mainStreamId + PARENT_USER_STREAM_SUFFIX + '-').length;
+  return key.length <= maxLength && /^[a-z0-9][a-z0-9-]*$/.test(key);
+}
+
 /**
  * Ensure base structure is created
  *
@@ -108,6 +149,8 @@ function streamIdForUserId (partnerUserId: string): string {
  * So don't classify by error id — verify the end state. If every base stream
  * exists once the batch returns, the streams are there and how they got there
  * doesn't matter. Only a genuinely missing stream is an error.
+ *
+ * `{main}-cmc` is added when config `cmc:enabled` is true.
  */
 async function ensureBaseStreams (): Promise<void> {
   const required = [
@@ -115,6 +158,9 @@ async function ensureBaseStreams (): Promise<void> {
     { id: settings.activeUsersStreamId!, name: 'Active Bridge Users' },
     { id: settings.errorStreamId!, name: 'Bridge Errors' }
   ];
+  if ((await getConfig()).get<boolean>('cmc:enabled') === true) {
+    required.push({ id: getCmcStreamId(), name: 'Bridge CMC' });
+  }
   const apiCalls = required.map(s => ({
     method: 'streams.create',
     params: { parentId: settings.mainStreamId, id: s.id, name: s.name }
@@ -242,6 +288,11 @@ export {
   streamIdForUserId,
   getUserParentStreamId,
   getActiveUserStreamId,
+  getCmcStreamId,
+  isValidCmcUserKey,
+  PRYV_STREAM_ID_MAX_LENGTH,
+  ensureBaseStreams,
+  _initForTests,
   logErrorOnBridgeAccount,
   getErrorsOnBridgeAccount,
   logSyncStatus,

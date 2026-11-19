@@ -43,8 +43,15 @@ const CREDENTIAL_TYPE = 'credentials/pryv-api-endpoint';
  * Now: reuse the existing credential event when there is one, updating it in place (and
  * re-asserting the active-users stream, so a previously deactivated user is reactivated
  * rather than duplicated). Only create when none exists.
+ *
+ * `opts.clientData` is set on create and merged (top-level keys) onto the stored clientData on
+ * update, e.g. the CMC relationship record under `hdsCmc`. Without it clientData is untouched.
  */
-async function addCredentialToBridgeAccount (partnerUserId: string, appApiEndpoint: string): Promise<unknown> {
+async function addCredentialToBridgeAccount (
+  partnerUserId: string,
+  appApiEndpoint: string,
+  opts: { clientData?: Record<string, unknown> } = {}
+): Promise<unknown> {
   const streamUserId = streamIdForUserId(partnerUserId);
   const streamIds = [streamUserId, getActiveUserStreamId()];
 
@@ -59,20 +66,84 @@ async function addCredentialToBridgeAccount (partnerUserId: string, appApiEndpoi
 
   const existing = pre[1]?.events?.[0];
   if (existing?.id != null) {
+    const update: Record<string, unknown> = { content: appApiEndpoint, streamIds };
+    if (opts.clientData != null) update.clientData = { ...(existing.clientData ?? {}), ...opts.clientData };
     const updated: any = await bridgeConnection().api([{
       method: 'events.update',
-      params: { id: existing.id, update: { content: appApiEndpoint, streamIds } }
+      params: { id: existing.id, update }
     }] as any);
     if (updated[0]?.error?.id != null) throw serviceError('Failed add user credentials', updated[0]);
     return updated[0];
   }
 
+  const params: Record<string, unknown> = { streamIds, type: CREDENTIAL_TYPE, content: appApiEndpoint };
+  if (opts.clientData != null) params.clientData = opts.clientData;
   const created: any = await bridgeConnection().api([{
     method: 'events.create',
-    params: { streamIds, type: CREDENTIAL_TYPE, content: appApiEndpoint }
+    params
   }] as any);
   if (created[0]?.error?.id != null) throw serviceError('Failed add user credentials', created[0]);
   return created[0];
+}
+
+export interface CredentialEvent {
+  id: string;
+  apiEndpoint: string;
+  clientData: Record<string, unknown>;
+}
+
+/** Every credential event of the user, newest first; null when the user stream does not exist. */
+async function credentialEvents (partnerUserId: string): Promise<any[] | null> {
+  const res: any = await bridgeConnection().api([{
+    method: 'events.get',
+    params: { streams: [streamIdForUserId(partnerUserId)], types: [CREDENTIAL_TYPE], state: 'all', limit: 1000 }
+  }] as any);
+  if (res[0]?.error?.id === 'unknown-referenced-resource') return null;
+  if (res[0]?.error != null) serviceError('Failed to read user credentials', { id: res[0].error.id });
+  return res[0]?.events ?? [];
+}
+
+/**
+ * The user's current (newest, non-trashed) credential event: its id, the stored apiEndpoint
+ * and its clientData (`{}` when none). Null when the user has none.
+ */
+async function getCredentialEvent (partnerUserId: string): Promise<CredentialEvent | null> {
+  const res: any = await bridgeConnection().api([{
+    method: 'events.get',
+    params: { streams: [streamIdForUserId(partnerUserId)], types: [CREDENTIAL_TYPE], limit: 1 }
+  }] as any);
+  if (res[0]?.error?.id === 'unknown-referenced-resource') return null;
+  if (res[0]?.error != null) serviceError('Failed to read user credentials', { id: res[0].error.id });
+  const event = res[0]?.events?.[0];
+  if (event == null) return null;
+  return { id: event.id, apiEndpoint: event.content, clientData: event.clientData ?? {} };
+}
+
+/**
+ * Delete (trash, then delete for good) every credential event of the user, which also takes the
+ * user out of the active-users stream. `onlyIfClientData` guards it on the CURRENT credential's
+ * clientData (e.g. a CMC generation check): when it returns false nothing is deleted.
+ * Returns `deleted`, `none` (no credential stored) or `refused` (the guard said no).
+ */
+async function deleteCredentialFromBridgeAccount (
+  partnerUserId: string,
+  opts: { onlyIfClientData?: (clientData: Record<string, unknown>) => boolean } = {}
+): Promise<'deleted' | 'none' | 'refused'> {
+  const events = await credentialEvents(partnerUserId);
+  if (events == null || events.length === 0) return 'none';
+  if (opts.onlyIfClientData != null) {
+    const current = events.find(e => e.trashed !== true);
+    if (current == null || !opts.onlyIfClientData(current.clientData ?? {})) return 'refused';
+  }
+  const calls: any[] = [];
+  for (const e of events) {
+    if (e.trashed !== true) calls.push({ method: 'events.delete', params: { id: e.id } });
+    calls.push({ method: 'events.delete', params: { id: e.id } });
+  }
+  const res: any = await bridgeConnection().api(calls as any);
+  const failed = (res as any[]).find(r => r?.error != null && r.error.id !== 'unknown-resource');
+  if (failed != null) serviceError('Failed to delete user credentials', { id: failed.error.id });
+  return 'deleted';
 }
 
 async function exists (partnerUserId: string): Promise<boolean> {
@@ -144,7 +215,7 @@ async function setStatus (partnerUserId: string, active?: boolean): Promise<{ ac
   }];
   const resultFromBC: any = await bridgeConnection().api(apiCalls as any);
   if (resultFromBC[0]?.error?.id === 'unknown-referenced-resource') unkownRessource('Unkown user', { userId: partnerUserId });
-  const error = resultFromBC.error || resultFromBC[1]?.error;
+  const error = resultFromBC.error || resultFromBC[0]?.error;
   if (error) serviceError('Failed to get user status', error);
   const userEvent = resultFromBC[0].events[0];
   const currentStatus = userEvent.streamIds.includes(getActiveUserStreamId());
@@ -203,6 +274,8 @@ export {
   status,
   exists,
   addCredentialToBridgeAccount,
+  getCredentialEvent,
+  deleteCredentialFromBridgeAccount,
   getPryvConnectionAndStatus,
   setStatus,
   getAllUsersApiEndpoints

@@ -1,7 +1,13 @@
 import assert from 'assert';
 import { EventEmitter } from 'events';
+import express from 'express';
 import type { Request, Response } from 'express';
-import { observabilityTiming, type ObsHolder } from '../src/lib/observability.ts';
+import { createObservability, type Window } from 'hds-observability-js';
+import initBoiler from '../src/initBoiler.ts';
+import {
+  observabilityTiming, initBridgeObservability, allowList, bridgeTelemetry, setTelemetryHolderForTests,
+  CMC_METHOD_IDS, CMC_ERROR_CODES, type ObsHolder
+} from '../src/lib/observability.ts';
 
 /**
  * Unit tests for the bridge telemetry middleware (plan 88). These exercise the
@@ -130,5 +136,81 @@ describe('[OBS] observability middleware', () => {
     await run({ method: 'GET', baseUrl: '', route: { path: '/status' } as Request['route'] }, fakeRes(200), { obs: null });
     // reaching here without throwing is the assertion
     assert.ok(true);
+  });
+});
+
+describe('[OBSC] closed sets: CMC ids, plugin extras, bridgeTelemetry', () => {
+  afterEach(() => setTelemetryHolderForTests(null));
+
+  function emitter (methods: string[], errorCodes: string[]) {
+    const windows: Window[] = [];
+    const refused: Array<[string, string]> = [];
+    const obs = createObservability<string, string>({
+      service: { name: 'test', version: '0', instance: 'i' },
+      methods,
+      errorCodes,
+      exporter: async (w) => { windows.push(w); },
+      minCellCount: 1,
+      setInterval: (() => ({ unref () {} })) as unknown as typeof setInterval,
+      onRefused: (reason, value) => { refused.push([reason, value]); }
+    });
+    return { obs, windows, refused };
+  }
+
+  it('[OBSD] the allow-list is routes + every CMC id + plugin extras, framework codes kept', () => {
+    const { methods, errorCodes } = allowList(['GET /status'], { methods: ['mira:sync'], errorCodes: ['mira_rate_limited'] });
+    assert.deepEqual(methods, ['GET /status', ...CMC_METHOD_IDS, 'mira:sync']);
+    for (const c of ['UNAUTHORIZED', 'INTERNAL_ERROR', ...CMC_ERROR_CODES, 'mira_rate_limited']) assert.ok(errorCodes.includes(c), c);
+    assert.equal(CMC_METHOD_IDS.length, 6);
+    assert.equal(CMC_ERROR_CODES.length, 10);
+    assert.deepEqual(allowList(['GET /status']).methods, ['GET /status', ...CMC_METHOD_IDS], 'no extras');
+  });
+
+  it('[OBSE] bridgeTelemetry drops silently before the emitter is built', () => {
+    bridgeTelemetry.recordCall('cmc:accept', '2xx', 1);
+    bridgeTelemetry.recordError('cmc_accept_host');
+    setTelemetryHolderForTests({ obs: null });
+    bridgeTelemetry.recordCall('cmc:accept', '2xx', 1);
+    assert.ok(true);
+  });
+
+  it('[OBSF] bridgeTelemetry forwards declared ids; an undeclared id is refused, never sent', async () => {
+    const { methods, errorCodes } = allowList(['GET /status'], { methods: ['mira:sync'] });
+    const { obs, windows, refused } = emitter(methods, errorCodes);
+    setTelemetryHolderForTests({ obs });
+    bridgeTelemetry.recordCall('cmc:accept', '2xx', 12);
+    bridgeTelemetry.recordCall('mira:sync', '5xx', 3);
+    bridgeTelemetry.recordError('cmc_accept_wrong_person');
+    bridgeTelemetry.recordCall('cmc:accept:alice', '2xx', 1);
+    bridgeTelemetry.recordError('cmc_not_declared');
+    await obs.flush();
+    const w = windows[0]!;
+    assert.deepEqual(w.calls.map(c => [c.method, c.statusClass]).sort(), [['cmc:accept', '2xx'], ['mira:sync', '5xx']]);
+    assert.deepEqual(w.errors.map(e => e.code), ['cmc_accept_wrong_person']);
+    assert.deepEqual(refused, [['unknown_method', 'cmc:accept:alice'], ['unknown_error_code', 'cmc_not_declared']]);
+    await obs.stop();
+  });
+
+  it('[OBSG] initBridgeObservability passes the extras and wires bridgeTelemetry to the holder', async () => {
+    initBoiler(`bridge-obs:${process.pid}`);
+    const prev = process.env.HDS_OTEL_ENDPOINT;
+    process.env.HDS_OTEL_ENDPOINT = 'http://127.0.0.1:9';
+    const app = express();
+    app.get('/status', (_req, res) => { res.end(); });
+    const holder: ObsHolder = { obs: null };
+    try {
+      const handle = await initBridgeObservability(app, { name: 'x', version: '1' }, holder, { methods: ['mira:sync'] });
+      assert.ok(handle != null && holder.obs != null);
+      const built = holder.obs;
+      const seen: string[] = [];
+      holder.obs = { ...built, recordCall: (m) => { seen.push(m); } };
+      bridgeTelemetry.recordCall('mira:sync', '2xx', 1);
+      assert.deepEqual(seen, ['mira:sync']);
+      holder.obs = built;
+      await handle.stop();
+      assert.equal(holder.obs, null);
+    } finally {
+      if (prev == null) delete process.env.HDS_OTEL_ENDPOINT; else process.env.HDS_OTEL_ENDPOINT = prev;
+    }
   });
 });

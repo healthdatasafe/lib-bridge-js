@@ -30,10 +30,50 @@ const FRAMEWORK_ERROR_CODES = [
 ] as const;
 type FrameworkErrorCode = (typeof FRAMEWORK_ERROR_CODES)[number];
 
+/**
+ * Closed sets of the CMC relationship module (plan 129, design §5.8). Always part of the
+ * allow-list: an id nothing records emits nothing, so declaring them costs nothing on bridges
+ * without CMC.
+ */
+export const CMC_METHOD_IDS = [
+  'cmc:accept', 'cmc:revoke', 'cmc:dispatch', 'cmc:scope-request', 'cmc:webhook', 'cmc:inbox-poll'
+] as const;
+export type CmcMethodId = (typeof CMC_METHOD_IDS)[number];
+
+export const CMC_ERROR_CODES = [
+  'cmc_accept_unknown_invite', 'cmc_accept_wrong_person', 'cmc_accept_host', 'cmc_accept_key',
+  'cmc_scope_request_open', 'cmc_webhook_reactivated', 'cmc_webhook_recreated', 'cmc_inbox_retry',
+  'cmc_revoke_confirmed', 'cmc_dispatch_coalesced'
+] as const;
+export type CmcErrorCode = (typeof CMC_ERROR_CODES)[number];
+
 /** Filled after routes are registered; the timing middleware reads it live. */
 export interface ObsHolder {
-  obs: Observability<string, FrameworkErrorCode> | null;
+  obs: Observability<string, string> | null;
 }
+
+/** Extra ids declared up front by the plugin or a standalone service (constants only). */
+export interface ObservabilityExtras {
+  methods?: readonly string[];
+  errorCodes?: readonly string[];
+}
+
+/** The holder `initBridgeObservability` last filled, read by `bridgeTelemetry`. */
+let telemetryHolder: ObsHolder | null = null;
+
+/**
+ * Record a non-HTTP operation (e.g. a CMC accept) on the bridge's emitter. Drops silently while
+ * observability is disabled or not yet built. An id outside the declared sets is refused by the
+ * emitter (counted as a drop, named in the local log), never sent. Never throws.
+ */
+export const bridgeTelemetry = {
+  recordCall (method: string, statusClass: StatusClass, durationMs: number): void {
+    try { telemetryHolder?.obs?.recordCall(method, statusClass, durationMs); } catch { /* never break the caller */ }
+  },
+  recordError (code: string): void {
+    try { telemetryHolder?.obs?.recordError(code); } catch { /* never break the caller */ }
+  }
+};
 
 const { getConfig, getLogger } = boiler;
 
@@ -168,11 +208,15 @@ function sanitize (v: string): string {
  * Build the emitter from the app's registered routes and fill the holder.
  * Call AFTER all routes (and plugin routes) are mounted. Returns a handle whose
  * `stop()` flushes and clears the timer; returns null when disabled.
+ *
+ * The allow-list is the route patterns, plus `CMC_METHOD_IDS` / `CMC_ERROR_CODES`, plus the
+ * `extras` (a plugin's `observabilityMethods` / `observabilityErrors`).
  */
 export async function initBridgeObservability (
   app: Application,
   pkg: { name?: string; version?: string },
-  holder: ObsHolder
+  holder: ObsHolder,
+  extras: ObservabilityExtras = {}
 ): Promise<{ stop: () => Promise<void> } | null> {
   const logger = getLogger('observability');
   const config = await getConfig();
@@ -194,19 +238,34 @@ export async function initBridgeObservability (
     return null;
   }
 
-  const obs = createObservability({
+  const { methods: allMethods, errorCodes } = allowList(methods, extras);
+  const obs = createObservability<string, string>({
     service: {
       name: sanitize(serviceName),
       version: sanitize(String(pkg.version ?? '0.0.0')),
       instance: sanitize(os.hostname() || String(process.pid))
     },
-    methods,
-    errorCodes: FRAMEWORK_ERROR_CODES,
+    methods: allMethods,
+    errorCodes,
     exporter: otlpExporter({ endpoint: metricsUrl(endpoint) }),
     onRefused: (reason, value) => logger.warn(`observability drop [${reason}]: ${value}`)
   });
 
   holder.obs = obs;
-  logger.info(`observability enabled: service=${sanitize(serviceName)} endpoint=${metricsUrl(endpoint)} methods=${methods.length}`);
+  telemetryHolder = holder;
+  logger.info(`observability enabled: service=${sanitize(serviceName)} endpoint=${metricsUrl(endpoint)} methods=${allMethods.length}`);
   return { stop: async () => { holder.obs = null; await obs.stop(); } };
+}
+
+/** Exported for tests: the closed sets built from the collected routes and the extras. */
+export function allowList (routeMethods: readonly string[], extras: ObservabilityExtras = {}): { methods: string[], errorCodes: string[] } {
+  return {
+    methods: [...new Set([...routeMethods, ...CMC_METHOD_IDS, ...(extras.methods ?? [])])],
+    errorCodes: [...new Set([...FRAMEWORK_ERROR_CODES, ...CMC_ERROR_CODES, ...(extras.errorCodes ?? [])])]
+  };
+}
+
+/** Tests: point `bridgeTelemetry` at a holder (null to detach). */
+export function setTelemetryHolderForTests (holder: ObsHolder | null): void {
+  telemetryHolder = holder;
 }

@@ -9,8 +9,14 @@ export * as errors from './errors/index.ts';
 // (route-pattern allow-list, unmatched-drop). Exported so standalone Express services
 // that do NOT boot through createBridgeApp (e.g. datasets-service, bridge-athenahealth)
 // can install the same timing middleware + emitter instead of copying the logic.
-export { observabilityTiming, initBridgeObservability } from './lib/observability.ts';
-export type { ObsHolder } from './lib/observability.ts';
+export {
+  observabilityTiming,
+  initBridgeObservability,
+  bridgeTelemetry,
+  CMC_METHOD_IDS,
+  CMC_ERROR_CODES
+} from './lib/observability.ts';
+export type { ObsHolder, ObservabilityExtras, CmcMethodId, CmcErrorCode } from './lib/observability.ts';
 
 // Crash-loop detection, for standalone services that run their own cluster primary
 // (startCluster is bound to createBridgeApp and a bridge account), e.g. hds-support-service.
@@ -24,13 +30,21 @@ export { default as ShortUniqueId } from 'short-unique-id';
 // Utilities needed by consumers (testing, setup)
 export { requiredPermissionsAndStreams } from './lib/plugins.ts';
 export { init as initPryvService, createuser as createPryvUser } from './lib/pryvService.ts';
-export { addCredentialToBridgeAccount } from './methods/user.ts';
+export { addCredentialToBridgeAccount, deleteCredentialFromBridgeAccount, getCredentialEvent } from './methods/user.ts';
+export type { CredentialEvent } from './methods/user.ts';
+
+// Bridge-account stream ids for the CMC relationship module (plan 129)
+export { getCmcStreamId, isValidCmcUserKey, PRYV_STREAM_ID_MAX_LENGTH } from './lib/bridgeAccount.ts';
+
+// Is a data grant still live? (`gone` only on an explicit refusal from the core)
+export { grantState, refusalId } from './lib/grantState.ts';
+export type { GrantState } from './lib/grantState.ts';
 
 // Logger (re-exported from dev-boiler to avoid duplicate singleton issues)
 export { getLogger } from './lib/PluginBridge.ts';
 
 // Shared cache (cluster-safe via memored)
-export { cacheGet, cacheSet, cacheDel, cacheTake, initCacheLocal } from './lib/cache.ts';
+export { cacheGet, cacheSet, cacheDel, cacheTake, cacheLock, cacheRenew, cacheUnlock, initCacheLocal } from './lib/cache.ts';
 
 // Durable per-user sync state, one `sync-status/bridge` event per user (plan 101 T7)
 export { SyncStateStore, SYNC_STATUS_TYPE } from './lib/syncState.ts';

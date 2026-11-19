@@ -30,6 +30,12 @@ export interface SyncStateStoreOptions {
   mainStreamId: () => string;
   /** Former per-bridge event type (e.g. `bridge/mira-sync-state`), read and migrated. */
   legacyType?: string;
+  /**
+   * Target this stream (or the stream a function returns for the key) instead of
+   * `{mainStreamId}-users-{key}`. The stream must exist: it is not created. Keys resolving to
+   * the same stream share ONE state event (e.g. a single `{main}-cmc` cursor).
+   */
+  streamId?: string | ((key: string) => string);
 }
 
 interface StoredEvent { id: string, content: any, time?: number, modified?: number }
@@ -50,6 +56,9 @@ export class SyncStateStore<T extends object = Record<string, unknown>> {
   }
 
   streamIdFor (partnerUserId: string): string {
+    const override = this.#opts.streamId;
+    if (typeof override === 'function') return override(partnerUserId);
+    if (override != null) return override;
     return `${this.#opts.mainStreamId()}-users-${partnerUserId}`;
   }
 
@@ -116,11 +125,13 @@ export class SyncStateStore<T extends object = Record<string, unknown>> {
     // The per-user stream normally exists (created with the user's credential), but a sync can
     // be the first writer on an account that never served this user: events.create alone then
     // fails with `unknown-referenced-resource`. An existing stream answers item-already-exists.
-    const created: any[] = await conn.api([
-      { method: 'streams.create', params: { id: streamId, parentId: `${this.#opts.mainStreamId()}-users`, name: partnerUserId } },
-      { method: 'events.create', params }
-    ]);
-    const newEvent = created[1]?.event;
+    // A `streamId` override is never created here (its parent is not `-users`).
+    const calls: any[] = [{ method: 'events.create', params }];
+    if (this.#opts.streamId == null) {
+      calls.unshift({ method: 'streams.create', params: { id: streamId, parentId: `${this.#opts.mainStreamId()}-users`, name: partnerUserId } });
+    }
+    const created: any[] = await conn.api(calls);
+    const newEvent = created[calls.length - 1]?.event;
     if (newEvent?.id == null) return null;
     this.#eventIds.set(partnerUserId, newEvent.id);
     if (legacy && legacyIds.length > 0) {
