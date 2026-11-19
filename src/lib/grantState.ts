@@ -35,14 +35,19 @@ export function refusalId (e: unknown): string | null {
 
 /** `live`, `gone` (the core says the grant no longer exists) or `unknown` (could not tell). */
 export async function grantState (connection: ApiConnection): Promise<GrantState> {
+  return (await readAccessInfo(connection)).state;
+}
+
+/** `grantState`, with the access-info itself when live. */
+export async function readAccessInfo (connection: ApiConnection): Promise<{ state: 'live', info: any } | { state: 'gone' | 'unknown' }> {
   let id: string | null;
   try {
     const res = await connection.api([{ method: 'getAccessInfo', params: {} }]);
     const error = res?.[0]?.error;
-    if (error == null) return 'live';
+    if (error == null) return { state: 'live', info: res?.[0] ?? {} };
     id = typeof error.id === 'string' ? error.id : null;
   } catch (e) {
     id = refusalId(e);
   }
-  return id != null && GONE_IDS.includes(id) ? 'gone' : 'unknown';
+  return { state: id != null && GONE_IDS.includes(id) ? 'gone' : 'unknown' };
 }

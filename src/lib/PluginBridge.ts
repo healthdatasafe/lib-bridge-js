@@ -5,6 +5,7 @@ import * as errors from '../errors/index.ts';
 import * as user from '../methods/user.ts';
 import { logSyncStatus } from './bridgeAccount.ts';
 import { cacheGet, cacheSet, cacheDel, cacheTake } from './cache.ts';
+import type { CmcRelationships } from '../cmc/types.ts';
 
 const { getLogger: _getLogger, getConfig } = boiler;
 
@@ -47,6 +48,12 @@ export default class PluginBridge {
   get observabilityErrors (): readonly string[] {
     return [];
   }
+
+  /**
+   * The plugin's CMC relationships (`createCmcRelationships`), when it serves CMC connections.
+   * Set and started by the plugin in `init`.
+   */
+  cmc: CmcRelationships | null = null;
 
   /**
    * private instance of config

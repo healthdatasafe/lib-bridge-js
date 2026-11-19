@@ -36,8 +36,16 @@ export type { CredentialEvent } from './methods/user.ts';
 // Bridge-account stream ids for the CMC relationship module (plan 129)
 export { getCmcStreamId, isValidCmcUserKey, PRYV_STREAM_ID_MAX_LENGTH } from './lib/bridgeAccount.ts';
 
+// CMC relationship module for collector-side bridges (plan 129)
+export { createCmcRelationships, CmcRelationshipError } from './cmc/index.ts';
+export type {
+  CmcRelationships, CmcRelationship, CmcRelationshipRecord, CmcHooks, CmcRelationshipsOptions, CmcScopeHealth,
+  CreateInviteParams, CreateInviteResult, PendingScopeRequest, ScopeOptions, ScopeAnswer, ChangeContext, EndReason,
+  SystemAlert, WebhookScopes
+} from './cmc/index.ts';
+
 // Is a data grant still live? (`gone` only on an explicit refusal from the core)
-export { grantState, refusalId } from './lib/grantState.ts';
+export { grantState, readAccessInfo, refusalId } from './lib/grantState.ts';
 export type { GrantState } from './lib/grantState.ts';
 
 // Logger (re-exported from dev-boiler to avoid duplicate singleton issues)
