@@ -21,6 +21,12 @@ const RETRY_BASE_S = 30;
 const RETRY_MAX_DELAY_S = 3600;
 /** About two days at the capped delay: an arrival still undecided then is dropped (logged). */
 const RETRY_MAX_ATTEMPTS = 50;
+/**
+ * An empty window still moves the cursor to `toTime`, persisted at most this often (a tick runs
+ * every 30 s). Without it a quiet inbox never writes a cursor, and a restart falls back to
+ * `initialCursor` again: an accept made during a long outage before the first arrival was lost.
+ */
+export const EMPTY_ADVANCE_S = 3600;
 
 export interface RetryItem { id: string; attempts: number; notBefore: number }
 export interface InboxState { cursor: number; overlapIds: string[]; retry: RetryItem[] }
@@ -60,7 +66,8 @@ function scheduleRetry (ctx: Ctx, state: InboxState, id: string, attempts: numbe
 export async function inboxTick (ctx: Ctx): Promise<void> {
   const started = ctx.now();
   const store = inboxStore(ctx);
-  const state: InboxState = { cursor: ctx.o.inbox.initialCursor ?? 0, overlapIds: [], retry: [], ...(await store.get(INBOX_STATE_KEY) ?? {}) };
+  const stored = await store.get(INBOX_STATE_KEY);
+  const state: InboxState = { cursor: ctx.o.inbox.initialCursor ?? 0, overlapIds: [], retry: [], ...(stored ?? {}) };
   const persist = async (): Promise<void> => {
     if (await store.patch(INBOX_STATE_KEY, state) == null) throw new Error('cmc inbox: cursor write failed');
     ctx.seen.cursor = state.cursor;
@@ -83,34 +90,49 @@ export async function inboxTick (ctx: Ctx): Promise<void> {
 
   // 2. new arrivals, oldest first, page by page
   const toTime = nowS(ctx) - ctx.o.inbox.lagS;
+  let fresh = 0;
+  let drained = false;
   for (;;) {
-    if (state.cursor > toTime) break;
+    if (state.cursor > toTime) { drained = true; break; }
     const res = await bridge.api([{
       method: 'events.get',
       params: { streams: [':_cmc:inbox'], types: [ACCEPT, REVOKE], fromTime: state.cursor, toTime, sortAscending: true, limit: PAGE_LIMIT }
     }]);
     if (res?.[0]?.error != null) throw new Error(`cmc inbox: read failed: ${res[0].error.id}`);
     const events: any[] = res?.[0]?.events ?? [];
-    if (events.length === 0) break;
+    if (events.length === 0) { drained = true; break; }
     const seen = new Set(state.overlapIds);
     const queued = new Set(state.retry.map(r => r.id));
+    let pageFresh = 0;
     for (const event of events) {
       if (seen.has(event.id) || queued.has(event.id)) continue;
+      pageFresh++;
       if (await processArrival(ctx, event) === 'retry') scheduleRetry(ctx, state, event.id, 0);
     }
+    fresh += pageFresh;
     const last = events[events.length - 1].time as number;
     const atLast = events.filter(e => e.time === last).map(e => e.id as string);
-    state.overlapIds = last === state.cursor ? [...new Set([...state.overlapIds, ...atLast])] : atLast;
+    const overlapIds = last === state.cursor ? [...new Set([...state.overlapIds, ...atLast])] : atLast;
     const moved = last !== state.cursor;
+    // the arrivals at the cursor come back on every tick: rewrite the state only when it changed
+    const changed = moved || pageFresh > 0 || overlapIds.length !== state.overlapIds.length;
+    state.overlapIds = overlapIds;
     state.cursor = last;
-    await persist();
-    if (events.length < PAGE_LIMIT) break;
+    if (changed) await persist();
+    if (events.length < PAGE_LIMIT) { drained = true; break; }
     if (!moved) {
       // a full page at one single time: the cursor cannot page past it
       ctx.logger.warn(`cmc inbox: more than ${PAGE_LIMIT} arrivals at time ${last}; the rest waits for the next tick`);
       break;
     }
   }
-  ctx.seen.cursor = state.cursor;
+  // 3. nothing new up to toTime: move past the empty window (throttled, see EMPTY_ADVANCE_S)
+  const idle = fresh === 0 && drained;
+  if (idle && toTime > state.cursor && (stored == null || toTime - state.cursor >= EMPTY_ADVANCE_S)) {
+    state.cursor = toTime;
+    state.overlapIds = [];
+    await persist();
+  }
+  ctx.seen.cursor = idle ? Math.max(state.cursor, toTime) : state.cursor;
   record('cmc:inbox-poll', '2xx', started, ctx);
 }

@@ -340,6 +340,53 @@ describe('[CMC] CMC relationship module', function () {
     assert.equal(ctx.seen.cursor, 1000 + PAGE_LIMIT + 4);
   });
 
+  /** Counts the writes of the inbox cursor event (`main-cmc`) from now on. */
+  function countCursorWrites (): { n: number } {
+    const w = { n: 0 };
+    const realApi = bridge.api.bind(bridge);
+    bridge.api = async (cs: any[]) => {
+      for (const c of cs) {
+        if (c.method === 'events.create' && c.params.streamIds?.includes('main-cmc')) w.n++;
+        if (c.method === 'events.update' && c.params.update?.content?.cursor != null) w.n++;
+      }
+      return realApi(cs);
+    };
+    return w;
+  }
+  const cursorState = () => bridge.ofType('sync-status/bridge').find(e => e.streamIds.includes('main-cmc'))?.content;
+
+  it('[CMIH] an idle inbox persists its cursor on the first tick, then advances it at most once per EMPTY_ADVANCE_S', async () => {
+    const { EMPTY_ADVANCE_S } = await import('../src/cmc/inbox.ts');
+    const w = countCursorWrites();
+    await t.inboxTick();
+    assert.equal(cursorState()?.cursor, 10000 - 120, 'first idle tick: cursor written at toTime');
+    assert.equal(w.n, 1);
+    clock += 60_000;
+    await t.inboxTick();
+    assert.equal(w.n, 1, 'no rewrite inside the throttle');
+    assert.equal(cmcRel.health().inboxLagS, 120, 'health reads the window as read up to toTime');
+    clock += EMPTY_ADVANCE_S * 1000;
+    await t.inboxTick();
+    assert.equal(w.n, 2);
+    assert.equal(cursorState()?.cursor, 10060 + EMPTY_ADVANCE_S - 120);
+  });
+
+  it('[CMII] after an arrival, quiet ticks leave the cursor event alone; it then moves past the arrival without reprocessing it', async () => {
+    const { EMPTY_ADVANCE_S } = await import('../src/cmc/inbox.ts');
+    await connect('alice', 9850);
+    await t.inboxTick();
+    assert.equal(calls.accepted.length, 1);
+    const w = countCursorWrites();
+    clock += 60_000;
+    await t.inboxTick();
+    assert.equal(w.n, 0, 'the arrival at the cursor is read back, the state is unchanged');
+    clock += EMPTY_ADVANCE_S * 1000;
+    await t.inboxTick();
+    assert.equal(w.n, 1);
+    assert.deepEqual(cursorState(), { ...cursorState(), cursor: 10060 + EMPTY_ADVANCE_S - 120, overlapIds: [] });
+    assert.equal(calls.accepted.length, 1, 'not processed again');
+  });
+
   it('[CMIE] unknown grant state goes to the retry list; the cursor still advances; retried later', async () => {
     const a = await connect('alice', 5000);
     await connect('bob', 5001);

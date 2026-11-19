@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.17.1] - 2026-11-19
+
+### Fixed
+
+- **CMC inbox cursor on a quiet inbox** (plan 129): a tick that reads nothing new now moves the cursor to `toTime`
+  and persists it, on the first tick when none is stored, then at most once per `EMPTY_ADVANCE_S` (1 h). Before, a
+  quiet inbox never wrote a cursor, so every restart fell back to `inbox.initialCursor` and an accept made during an
+  outage longer than that window was still missed until the first arrival; and once an arrival existed the cursor
+  stayed on it, so `health().inboxLagS` grew without bound.
+- The cursor event is rewritten only when its state changed. Before, the arrivals at the cursor, read back on every
+  tick, rewrote an unchanged event every 30 s.
+
 ## [0.17.0] - 2026-11-19
 
 ### Added
