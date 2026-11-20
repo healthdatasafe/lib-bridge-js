@@ -38,4 +38,10 @@ describe('[GRST] grantState', function () {
     assert.equal(refusalId(new Error('API call result is not an Array: not json')), null);
     assert.equal(refusalId(null), null);
   });
+
+  it('[GRS4] refusalId reads pryv 3.19 accessInfo() rejections (innerObject is the call error)', function () {
+    const e = Object.assign(new Error('Invalid access token'), { innerObject: { id: 'invalid-access-token', message: 'Invalid access token' } });
+    assert.equal(refusalId(e), 'invalid-access-token');
+    assert.equal(refusalId({ innerObject: { error: { id: 'forbidden' }, id: 'other' } }), 'forbidden');
+  });
 });

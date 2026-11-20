@@ -17,12 +17,13 @@ const NOT_AN_ARRAY = 'API call result is not an Array: ';
 
 /**
  * The core's error id when it refused the request, whichever way lib-js reports it: a per-call
- * error result, a PryvError carrying the body (`innerObject` / `response.body`), or (pryv <= 3.13)
- * the body as JSON in the message.
+ * error result, a PryvError carrying the body (`innerObject` / `response.body`), a PryvError
+ * carrying the call's error itself (`innerObject = { id, message }`, pryv 3.19 `accessInfo()`),
+ * or (pryv <= 3.13) the body as JSON in the message.
  */
 export function refusalId (e: unknown): string | null {
-  const err = e as { innerObject?: { error?: { id?: unknown } }, id?: unknown, response?: { body?: { error?: { id?: unknown } } }, message?: unknown };
-  const id = err?.innerObject?.error?.id ?? err?.response?.body?.error?.id ?? err?.id;
+  const err = e as { innerObject?: { id?: unknown, error?: { id?: unknown } }, id?: unknown, response?: { body?: { error?: { id?: unknown } } }, message?: unknown };
+  const id = [err?.innerObject?.error?.id, err?.innerObject?.id, err?.response?.body?.error?.id, err?.id].find((v) => typeof v === 'string');
   if (typeof id === 'string') return id;
   if (typeof err?.message === 'string' && err.message.startsWith(NOT_AN_ARRAY)) {
     try {

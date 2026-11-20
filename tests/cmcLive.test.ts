@@ -62,12 +62,29 @@ async function liveEnabled (): Promise<string | null> {
   return typeof url === 'string' && TEST_PLATFORM.test(url) ? url : null;
 }
 
+/** Every throwaway account this run created, deleted in `after`. */
+const created: Person[] = [];
+
 async function newAccount (service: InstanceType<typeof pryv.Service>, prefix: string, appId: string): Promise<Person> {
   const username = prefix + crypto.randomBytes(4).toString('hex');
   const password = crypto.randomBytes(18).toString('base64url');
   await (service as any).createUser({ username, password, email: username + '@example.com', hosting: 'auto', appId, language: 'en' });
   const conn = await service.login(username, password, appId + '-cmc-live');
+  created.push({ username, conn });
   return { username, conn };
+}
+
+/**
+ * Self-service account deletion (`auth.delete`, allowed with the personal token on demo):
+ * `DELETE /users/<username>` at the root of the account's home core, which the register names.
+ */
+async function deleteAccount (service: InstanceType<typeof pryv.Service>, p: Person): Promise<void> {
+  const register = (await service.info()).register;
+  const res = await fetch(register.replace(/\/?$/, '/') + encodeURIComponent(p.username) + '/server', { method: 'POST', headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error(`home core lookup: HTTP ${res.status}`);
+  const server: string = (await res.json()).server;
+  const del = await fetch(server.replace(/\/?$/, '/') + 'users/' + encodeURIComponent(p.username), { method: 'DELETE', headers: { Authorization: (p.conn as any).token } });
+  if (!del.ok) throw new Error(`HTTP ${del.status}`);
 }
 
 async function api (conn: { api: (c: any[]) => Promise<any> }, method: string, params: any): Promise<any> {
@@ -160,6 +177,11 @@ describe('[LCM] CMC relationship module, live core', function () {
     (await getConfig()).set('cmc:enabled', false);
     setTelemetryHolderForTests(null);
     restore?.();
+    const failed: string[] = [];
+    for (const p of created.splice(0)) {
+      try { await deleteAccount(service, p); } catch (e) { failed.push(`${p.username} (${(e as Error).message})`); }
+    }
+    if (failed.length > 0) console.warn(`[LCM] throwaway accounts left on the platform: ${failed.join(', ')}`);
   });
 
   /** The bridge's inbox arrivals of `type` from `username`. */

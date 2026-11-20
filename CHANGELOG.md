@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.17.2] - 2026-11-20
+
+### Fixed
+
+- **`refusalId` reads pryv 3.19's `accessInfo()` rejection** (B-2026-11-19-39): its `innerObject` is the call's
+  error itself (`{ id, message }`), so an `invalid-access-token` there read as "could not tell". Today's callers go
+  through `api()` and were not affected. Test `[GRS4]`.
+- **Live CMC suite deletes its throwaway accounts** (B-2026-11-19-14): the bridge account and the three people are
+  deleted in `after` through self-service account deletion on their home core; any left over is named in a warning.
+  Checked on demo: 6 passing, the accounts no longer resolve.
+
+### Security
+
+- **Dependabot alerts on main closed** (B-2026-11-19-20): `npm audit fix` moves body-parser to 1.20.9, qs to 6.16.2
+  and serialize-javascript to 7.1.4; overrides move mocha's minimatch 10 to 11 and its glob 13 to 14 (dev only).
+  `npm audit`: 0 vulnerabilities.
+
 ## [0.17.1] - 2026-11-19
 
 ### Fixed
