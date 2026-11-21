@@ -41,8 +41,11 @@ export { createCmcRelationships, CmcRelationshipError } from './cmc/index.ts';
 export type {
   CmcRelationships, CmcRelationship, CmcRelationshipRecord, CmcHooks, CmcRelationshipsOptions, CmcScopeHealth,
   CreateInviteParams, CreateInviteResult, PendingScopeRequest, ScopeOptions, ScopeAnswer, ChangeContext, EndReason,
-  SystemAlert, WebhookScopes
+  SystemAlert, WebhookScopes, CmcConversation
 } from './cmc/index.ts';
+// The standard conversation (data-model 4.22.0), the contact's side bound to one relationship (also `rel.conversation`)
+export { bindConversation } from './cmc/conversation.ts';
+export type { ConversationBinding } from './cmc/conversation.ts';
 
 // Is a data grant still live? (`gone` only on an explicit refusal from the core)
 export { grantState, readAccessInfo, refusalId } from './lib/grantState.ts';

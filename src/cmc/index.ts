@@ -16,6 +16,7 @@ import { ensureLive, firstConnectAllowed, reportAccessError, revoke } from './re
 import { mountWebhookRoute, reconcileOne } from './webhook.ts';
 import { publishStatus, sendAlert, settleStatusWrites } from './status.ts';
 import { createInvite, checkScope, newScopeState } from './invite.ts';
+import { bindConversation } from './conversation.ts';
 import type { CmcRelationship, CmcRelationships, CmcRelationshipsOptions, CmcRelationshipRecord } from './types.ts';
 
 const { getConfig } = boiler;
@@ -44,7 +45,8 @@ function makeRelationship (ctx: Ctx, entry: Entry): CmcRelationship {
       pending: () => openRequest(ctx, entry)
     },
     status: (outcome) => publishStatus(ctx, entry, outcome),
-    sendSystemAlert: (a) => sendAlert(ctx, { username: snapshot.username, host: snapshot.host, scopeStreamId: snapshot.scopeStreamId }, a)
+    sendSystemAlert: (a) => sendAlert(ctx, { username: snapshot.username, host: snapshot.host, scopeStreamId: snapshot.scopeStreamId }, a),
+    conversation: bindConversation({ person: () => ctx.connectionFor(apiEndpoint), bridge: () => ctx.bridge(), record: snapshot })
   };
 }
 

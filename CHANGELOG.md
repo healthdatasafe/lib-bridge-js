@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.18.0] - 2026-11-21
+
+### Added
+
+- **`rel.conversation`, the standard conversation, the contact's side** (data-model 4.22.0
+  `documentation/CONVERSATION.md`, plan 128 P1): `postStatus`, `postNotice`, `proposeValues` (idempotent per
+  `candidateId`, one `proposed-values` alert per batch), `ask` (+ its `question` alert), `read` (a document's items
+  settled), `answerAlerts` + `answerOf` (her answers, resolved only on her `sent` child), `cleanupDocument` and
+  `deleteOwnAlerts` (R10), `streams`. Bound to the relationship's data grant and the bridge's collectors stream,
+  over hds-lib `cmcConversation`, which checks every item and alert before it is written. Also
+  `bindConversation` for use outside the CMC module. Tests `[BCNV1]`..`[BCNV5]`, with a round trip against the
+  person's side of hds-lib.
+
+### Changed
+
+- hds-lib 2.59.0 (`cmcConversation`).
+
 ## [0.17.2] - 2026-11-20
 
 ### Fixed
