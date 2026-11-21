@@ -2,7 +2,10 @@
  * Public types of the CMC relationship module (plan 129, DESIGN.md §4 and §6).
  */
 import type { Application } from 'express';
-import type { pryv, ScopePermission, FormSpec } from 'hds-lib';
+import type {
+  pryv, ScopePermission, FormSpec, ConversationAlert, ConversationItem, ConversationStreams, DocumentConversation,
+  ProposedValuesWritten, TaskStatus
+} from 'hds-lib';
 import type { ConnectorOutcome } from '../lib/connectorStatus.ts';
 
 export type { ScopePermission };
@@ -68,6 +71,44 @@ export interface CmcRelationship {
   status (outcome: ConnectorOutcome): Promise<void>;
   /** A value-free system alert to the person. */
   sendSystemAlert (a: SystemAlert): Promise<void>;
+  /** The standard conversation with the person (questions, proposed values, her answers; data-model 4.22.0). */
+  conversation: CmcConversation;
+}
+
+/**
+ * The contact's side of the standard conversation (data-model `documentation/CONVERSATION.md`), bound to one
+ * relationship. Items are written on her account through the data grant, alerts on the bridge account's collectors
+ * stream. Every item and alert is checked before it is written (hds-lib `cmcConversation`).
+ */
+export interface CmcConversation {
+  /** Her two children granted to this relationship (`contribute` on received, `read` on sent); null until granted. */
+  streams (): Promise<ConversationStreams | null>;
+  /** The state of the work on one document (R4: the latest by time; `attempt` from 1, a label). */
+  postStatus (about: string, status: TaskStatus, opts: { attempt: number; counts?: { proposed?: number; questions?: number; keptAside?: number; dropped?: number }; errorCode?: string }): Promise<{ alertEventId: string }>;
+  /** A notice by code (`no-result-found`, `typed-text-not-read`, or `x-<vendor>-…`). */
+  postNotice (code: string, about?: string): Promise<{ alertEventId: string }>;
+  /**
+   * Write proposed values of one document on her received child (`kind` and `about` filled in), idempotent per
+   * `candidateId` (R5), then one `proposed-values` alert when anything was created or updated.
+   */
+  proposeValues (about: string, values: Array<Record<string, unknown>>): Promise<ProposedValuesWritten & { alertEventId: string | null }>;
+  /** Write one question on her received child (`kind` filled in; `about` required), then its `question` alert. */
+  ask (question: Record<string, unknown> & { about: string; code: string }): Promise<{ eventId: string; alertEventId: string }>;
+  /** One document's conversation as it stands: proposed values and their state, questions, her answers. */
+  read (about: string): Promise<DocumentConversation>;
+  /** The `answer` alerts she sent (delivered on the bridge's collectors stream), oldest first. */
+  answerAlerts (opts?: { fromTime?: number; limit?: number }): Promise<ConversationAlert[]>;
+  /** The answer an alert points at, read only on her sent child and matching the alert (R11); null otherwise. */
+  answerOf (alert: ConversationAlert): Promise<ConversationItem | null>;
+  /** Delete items on her received child (trashed, then deleted). */
+  deleteItems (eventIds: string[]): Promise<void>;
+  /**
+   * R10 on her account: `done` deletes what is settled (written, skipped, duplicate, requested, replaced, answered
+   * questions, identity questions); `not-mine` and `unshared` delete every item of the document. Returns the ids.
+   */
+  cleanupDocument (about: string, why: 'done' | 'not-mine' | 'unshared'): Promise<string[]>;
+  /** R10 on the bridge account: delete its copies of conversation alerts once the work they are about is done. */
+  deleteOwnAlerts (alertEventIds: string[]): Promise<void>;
 }
 
 export interface SystemAlert {

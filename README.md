@@ -229,6 +229,37 @@ verified username and host): the credential event of `{main}-users-{userKey}` wi
   telemetry through the closed sets `CMC_METHOD_IDS` / `CMC_ERROR_CODES`, and `connection()` is the only way to the
   grant. Keep it so in hooks.
 
+### The standard conversation (`rel.conversation`)
+
+A bridge that reads documents and proposes values (the HDS Reader, a third party's counterparty) talks to the person
+through the standard conversation of the relationship, data-model 4.22.0 `documentation/CONVERSATION.md` (the wire
+contract). `rel.conversation` is bound to one relationship: items go on her account through the data grant (her app
+creates the two `conversation-items` children and grants `contribute` on `received`, `read` on `sent`), alerts on the
+bridge account's collectors stream of that person. Every item and alert is checked first (hds-lib `cmcConversation`).
+
+```typescript
+const conv = rel.conversation;
+await conv.postStatus(docId, 'reading', { attempt: 1 });
+await conv.proposeValues(docId, [{ candidateId, printed, anchor, proposal, status: 'clear', extraction }]); // + 1 alert
+await conv.ask({ about: docId, code: 'is-this-yours', context: { identity } });                         // + its alert
+await conv.postStatus(docId, 'awaiting-answers', { attempt: 1, counts: { proposed, questions, keptAside, dropped } });
+
+for (const alert of await conv.answerAlerts({ fromTime })) {   // her answers, delivered on the collectors stream
+  const answer = await conv.answerOf(alert);                    // null unless on her sent child (R11)
+  const state = await conv.read(alert.hds.about);               // confirmed / corrected / skipped / replaced ...
+}
+await conv.postStatus(docId, 'done', { attempt: 1 });
+await conv.cleanupDocument(docId, 'done');                      // R10 on her account; 'not-mine' / 'unshared' too
+await conv.deleteOwnAlerts(alertIds);                           // R10 on the bridge account
+```
+
+- **The bridge never writes a value**: her app writes what she confirmed (`answer.written` says which event).
+- `proposeValues` is idempotent per `candidateId` (R5): an unanswered candidate is rewritten in place, an answered or
+  written one is left alone; derive `candidateId` deterministically from the document, the record and the proposal.
+- No value, name or date ever goes in an alert or a chat message (R6): the alerts carry kinds, ids, codes and counts.
+- `conv.streams()` is null until she granted the children; the other calls then refuse with `no-conversation`.
+- `bindConversation({ person, bridge, record })` gives the same object outside the CMC module.
+
 ## Storage
 
 The bridge uses a dedicated HDS account for storage. Under the root stream (`service.bridgeAccountMainStreamId`, default "bridge"):

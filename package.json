@@ -1,6 +1,6 @@
 {
   "name": "lib-bridge-js",
-  "version": "0.17.2",
+  "version": "0.18.0",
   "description": "Bridge framework library for HDS partner integrations",
   "type": "module",
   "main": "dist/src/index.js",
@@ -35,7 +35,7 @@
     "dev-boiler": "github:healthdatasafe/dev-boiler",
     "express": "^4.19.2",
     "express-promise-router": "^4.1.1",
-    "hds-lib": "github:healthdatasafe/hds-lib-js#2.57.0",
+    "hds-lib": "github:healthdatasafe/hds-lib-js#2.59.0",
     "hds-observability-js": "github:healthdatasafe/hds-observability-js",
     "memored": "^1.1.1",
     "short-unique-id": "^5.2.0"
