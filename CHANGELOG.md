@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.18.1] - 2026-11-21
+
+### Fixed
+
+- **An invite bound to a person no longer names her as its sender.** `createInvite({ expectedUsername })` wrote the
+  expected username as the invite's `displayName` (and so its title), so the invited person read "Invitation from
+  <her own username>" (seen on demo, plan 128 H3). The display name and title are now the bridge's own: config
+  `cmc:invite:displayName` (option `invite.displayName`), default the app code. The binding is unchanged: it is
+  `requesterMeta.hdsExpectedUsername`, which accept reads first; `displayName` still binds only a legacy invite
+  without that marker. Tests `[CMIA]`, `[CMIN]`; the live suite asserts it too.
+
 ## [0.18.0] - 2026-11-21
 
 ### Added

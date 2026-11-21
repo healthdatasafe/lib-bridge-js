@@ -186,7 +186,7 @@ the partner onboarding flow. Partner bridges are untouched.
 **Enable** with config `cmc:enabled: true` (creates the `{main}-cmc` stream that holds the inbox cursor; `start()`
 refuses without it). `service:apiEndpointHostPattern` must name the platform's domain (null refuses every accept) and
 `service:patientAppBaseUrl` the HDS app. Other keys and their defaults are in `config/default-config.yml` § `cmc:`
-(app code, invite expiry and features, inbox interval and lag, scope poll, reconciliation, lease TTL, webhooks).
+(app code, invite expiry, features and `displayName`, inbox interval and lag, scope poll, reconciliation, lease TTL, webhooks).
 
 **Start it from `PluginBridge.init`**, before the lib collects route patterns for telemetry (plugin init already runs
 first):
@@ -210,7 +210,7 @@ override async init (app: Application, bridgeConnectionGetter: () => unknown) {
 }
 ```
 
-Then `cmc.createInvite({ expectedUsername })` → `{ inviteEventId, capabilityUrl, patientUrl }`; `cmc.get(userKey)` →
+Then `cmc.createInvite({ expectedUsername })` (the person it is bound to, checked at accept and never shown: the invite names the bridge by `cmc:invite:displayName`, default the app code) → `{ inviteEventId, capabilityUrl, patientUrl }`; `cmc.get(userKey)` →
 the relationship (`record`, `connection()` over the data grant, `scope.widen / replace / requestDataSet`, `status`,
 `sendSystemAlert`); `ensureLive`, `firstConnectAllowed`, `reportAccessError` (after a `forbidden` /
 `invalid-access-token` from a write), `revoke`. Storage is keyed per person (`userKey`, default the slug of the

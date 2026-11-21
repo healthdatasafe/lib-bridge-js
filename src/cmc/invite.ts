@@ -83,8 +83,10 @@ export async function createInvite (ctx: Ctx, s: ScopeState, p: CreateInvitePara
   const params = {
     appCode: ctx.o.appCode,
     scopeStreamId,
-    // mira's binding: the expected username as displayName (its existing invites bind by it)
-    displayName: expected ?? ctx.o.appCode,
+    // the bridge's own name, shown to the person ("Invitation from …"): never the expected username, which
+    // made the person read her own username as the inviter. The binding is the marker below; accept reads
+    // displayName only on a legacy invite that has no marker (mira's earlier invites)
+    displayName: ctx.o.invite.displayName,
     // the marker tells a new invite from a legacy one: '' = no expected username
     requesterMeta: { [EXPECTED_USERNAME_KEY]: expected ?? '' },
     requestedPermissions: requestedPermissions as any[],

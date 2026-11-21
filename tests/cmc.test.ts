@@ -145,11 +145,12 @@ describe('[CMC] CMC relationship module', function () {
 
   // ---- invite ---- //
 
-  it('[CMIA] createInvite: expected username as displayName + marker, explicit features, single-use, patient URL', async () => {
+  it('[CMIA] createInvite: expected username in the marker only, the bridge\'s name as displayName, explicit features, single-use, patient URL', async () => {
     const r = await cmcRel.createInvite({ expectedUsername: 'alice' });
     const trigger = bridge.events.find(e => e.id === r.inviteEventId)!;
     assert.deepEqual(trigger.streamIds, [SCOPE]);
-    assert.equal(trigger.content.requesterMeta.displayName, 'alice');
+    assert.equal(trigger.content.requesterMeta.displayName, 'hds-bridge-reader', 'never the invited person\'s username');
+    assert.deepEqual(trigger.content.request.title, { en: 'hds-bridge-reader' }, 'the invite title names the bridge too');
     assert.equal(trigger.content.requesterMeta.hdsExpectedUsername, 'alice');
     assert.deepEqual(trigger.content.request.features, { chat: false, systemMessaging: true });
     assert.deepEqual(trigger.content.request.permissions, [{ streamId: 'hds-reader-inbox', level: 'read' }]);
@@ -158,6 +159,17 @@ describe('[CMC] CMC relationship module', function () {
     assert.ok(r.patientUrl.startsWith('https://demo-app.datasafe.test/?action=invite&capabilityUrl=https%3A%2F%2Fcap-'));
     const open = await cmcRel.createInvite({});
     assert.equal(bridge.events.find(e => e.id === open.inviteEventId)!.content.requesterMeta.hdsExpectedUsername, '');
+  });
+
+  it('[CMIN] createInvite: the invite\'s display name and title come from cmc:invite:displayName; the binding stays in the marker', async () => {
+    make({ invite: { displayName: 'HDS Reader' } });
+    const r = await cmcRel.createInvite({ expectedUsername: 'alice' });
+    const trigger = bridge.events.find(e => e.id === r.inviteEventId)!;
+    assert.equal(trigger.content.requesterMeta.displayName, 'HDS Reader');
+    assert.deepEqual(trigger.content.request.title, { en: 'HDS Reader' });
+    assert.equal(trigger.content.requesterMeta.hdsExpectedUsername, 'alice');
+    const open = await cmcRel.createInvite({});
+    assert.equal(bridge.events.find(e => e.id === open.inviteEventId)!.content.requesterMeta.displayName, 'HDS Reader');
   });
 
   it('[CMIB] createInvite refuses webhooks/accessCreation forbidden while webhooks are on; creates a missing bare scope', async () => {
