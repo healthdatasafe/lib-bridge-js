@@ -53,6 +53,9 @@ cmc:
   invite:
     expiresInSeconds: 604800
     features: { chat: false, systemMessaging: true }
+    # how the bridge is named to the person on its invites ("Invitation from ..."); null: the app code.
+    # Never the invited person's username: the binding to her is requesterMeta.hdsExpectedUsername
+    displayName: null
   inbox:
     intervalS: 30
     lagS: 120

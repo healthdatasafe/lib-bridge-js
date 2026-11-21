@@ -21,7 +21,7 @@ export const CREDENTIAL_TYPE = 'credentials/pryv-api-endpoint';
 export interface Resolved {
   appCode: string;
   scopeStreamId: string;
-  invite: { expiresInSeconds: number; features: { chat?: boolean; systemMessaging?: boolean } };
+  invite: { expiresInSeconds: number; features: { chat?: boolean; systemMessaging?: boolean }; displayName: string };
   inbox: { intervalMs: number; lagS: number; initialCursor: number | null };
   scopePollMs: number;
   reconcileMs: number;
@@ -87,7 +87,9 @@ export async function createContext (options: CmcRelationshipsOptions): Promise<
     scopeStreamId: cmc.appScope(appCode),
     invite: {
       expiresInSeconds: pick(options.invite?.expiresInSeconds, 'cmc:invite:expiresInSeconds', DEFAULTS.invite.expiresInSeconds),
-      features: pick(options.invite?.features, 'cmc:invite:features', DEFAULTS.invite.features)
+      features: pick(options.invite?.features, 'cmc:invite:features', DEFAULTS.invite.features),
+      // how the bridge is named to the person on its invite; never the person's own username
+      displayName: pick<string | null>(options.invite?.displayName, 'cmc:invite:displayName', null) || appCode
     },
     inbox: {
       intervalMs: 1000 * pick(options.inbox?.intervalS, 'cmc:inbox:intervalS', DEFAULTS.inbox.intervalS),

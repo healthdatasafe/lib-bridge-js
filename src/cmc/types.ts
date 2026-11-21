@@ -161,7 +161,7 @@ export interface CmcScopeHealth {
 }
 
 export interface CreateInviteParams {
-  /** The person expected to accept; written as the invite's displayName and checked at accept. */
+  /** The person expected to accept; carried as `requesterMeta.hdsExpectedUsername` and checked at accept (never shown). */
   expectedUsername?: string;
   requestedPermissions?: ScopePermission[];
   consent?: Record<string, string>;
@@ -205,7 +205,8 @@ export interface CmcRelationshipsOptions {
   appCode?: string;
   /** The bridge account's connection. Default: the lib's bridge account. */
   bridgeConnection?: () => unknown;
-  invite?: { expiresInSeconds?: number; features?: { chat?: boolean; systemMessaging?: boolean } };
+  /** `cmc:invite:*`. `displayName`: how the bridge is named to the person on its invites (default: the app code). */
+  invite?: { expiresInSeconds?: number; features?: { chat?: boolean; systemMessaging?: boolean }; displayName?: string };
   inbox?: { intervalS?: number; lagS?: number; initialCursor?: number | null };
   scope?: { pollIntervalS?: number };
   reconcile?: { intervalS?: number };

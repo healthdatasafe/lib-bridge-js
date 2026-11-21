@@ -209,7 +209,7 @@ describe('[LCM] CMC relationship module, live core', function () {
     // [V] the core's stamp on the invite trigger keeps requesterMeta.hdsExpectedUsername
     const trigger = (await api(bridge, 'events.getOne', { id: inv.inviteEventId })).event;
     assert.equal(trigger.content.requesterMeta?.hdsExpectedUsername, alice.username);
-    assert.equal(trigger.content.requesterMeta?.displayName, alice.username);
+    assert.notEqual(trigger.content.requesterMeta?.displayName, alice.username, 'the invite never names the invited person as its sender');
     assert.equal(typeof trigger.content.backChannelAccessId, 'string', 'stamped accepted by the core');
 
     await until('onAccepted', async () => { await t.inboxTick(); return calls.accepted.length > 0; });
