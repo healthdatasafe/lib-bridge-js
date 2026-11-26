@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.18.2] - 2026-11-26
+
+### Fixed
+
+- **The CMC module no longer writes the person's username in log lines or error messages.** A relationship is named by
+  `logKey(userKey)`, a 12-hex hash (`sha256('log|' + key)`, the HDS Reader engine's), instead of its key, whose default
+  `counterpartySlug` is `<username>--<host>`: the info lines of a stored or ended relationship and about 15 warnings
+  (accept, status, scope, context, revoke, webhook, reconcile), and the `CmcRelationshipError` messages. To find a known
+  key's lines, hash it. Tests `[CLK1]`, `[CLK2]` (the second fails on any new log call or error in `src/cmc` that
+  interpolates a raw `userKey`).
+
 ## [0.18.1] - 2026-11-21
 
 ### Fixed

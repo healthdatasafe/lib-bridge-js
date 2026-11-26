@@ -15,6 +15,7 @@ import {
 } from './context.ts';
 import { publishStatus } from './status.ts';
 import type { EndReason } from './types.ts';
+import { logKey } from './logKey.ts';
 
 export type TeardownResult = 'torn-down' | 'stale' | 'hook-failed';
 
@@ -25,7 +26,7 @@ export async function teardownLocked (ctx: Ctx, userKey: string, generation: str
   try {
     await ctx.hooks.onRevoked(ctx.rel(entry), reason);
   } catch (e) {
-    ctx.logger.warn(`cmc teardown ${userKey}: onRevoked failed (${entry.record.relationshipId}), record kept: ${errorMessage(e)}`);
+    ctx.logger.warn(`cmc teardown ${logKey(userKey)}: onRevoked failed (${entry.record.relationshipId}), record kept: ${errorMessage(e)}`);
     return 'hook-failed';
   }
   const deleted = await deleteCredentialFromBridgeAccount(userKey, {
@@ -34,7 +35,7 @@ export async function teardownLocked (ctx: Ctx, userKey: string, generation: str
   if (deleted === 'refused') return 'stale';
   await cacheDel(againKey(userKey));
   if (entry.record.webhook != null) await forgetHook(entry.record.webhook.hookId);
-  ctx.logger.info(`cmc teardown ${userKey}: relationship ${entry.record.relationshipId} ended (${reason})`);
+  ctx.logger.info(`cmc teardown ${logKey(userKey)}: relationship ${entry.record.relationshipId} ended (${reason})`);
   return 'torn-down';
 }
 
@@ -73,11 +74,11 @@ export async function firstConnectAllowed (ctx: Ctx, userKey: string): Promise<b
   const entry = await getEntry(userKey);
   if (entry == null) return true;
   if (!hostAllowed(ctx, entry.apiEndpoint)) {
-    ctx.logger.warn(`cmc first connect ${userKey}: the stored grant is not on this platform, ignored`);
+    ctx.logger.warn(`cmc first connect ${logKey(userKey)}: the stored grant is not on this platform, ignored`);
     return true;
   }
   const { state } = await confirm(ctx, entry);
-  if (state === 'unknown') ctx.logger.warn(`cmc first connect ${userKey}: refused, the stored grant's state could not be told`);
+  if (state === 'unknown') ctx.logger.warn(`cmc first connect ${logKey(userKey)}: refused, the stored grant's state could not be told`);
   return state === 'gone';
 }
 
@@ -99,7 +100,7 @@ export async function revoke (ctx: Ctx, userKey: string): Promise<void> {
     await cmc.revokeRelationship(ctx.bridge(), { accessId: entry.record.relationshipId, scopeStreamId: entry.record.scopeStreamId });
     return await teardownLocked(ctx, userKey, entry.record.generation, 'revoked-by-bridge');
   }, ctx.o.leaseTtlMs);
-  if (res.busy) throw new Error(`cmc revoke ${userKey}: relationship busy`);
+  if (res.busy) throw new Error(`cmc revoke ${logKey(userKey)}: relationship busy`);
   record('cmc:revoke', res.value === 'hook-failed' ? '5xx' : '2xx', started, ctx);
 }
 
