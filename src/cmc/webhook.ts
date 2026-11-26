@@ -17,6 +17,7 @@ import {
 } from './context.ts';
 import { confirm } from './revoke.ts';
 import type { ChangeContext } from './types.ts';
+import { logKey } from './logKey.ts';
 
 const MISS_KEY = (hookId: string): string => `cmc:hook-miss:${hookId}`;
 const REBUILT_KEY = 'cmc:hook-rebuilt';
@@ -39,7 +40,7 @@ export async function createWebhook (ctx: Ctx, entry: Entry): Promise<void> {
     record('cmc:webhook', '2xx', started, ctx);
   } catch (e) {
     record('cmc:webhook', '5xx', started, ctx);
-    ctx.logger.warn(`cmc webhook ${entry.userKey}: create failed, reconciliation retries: ${errorMessage(e)}`);
+    ctx.logger.warn(`cmc webhook ${logKey(entry.userKey)}: create failed, reconciliation retries: ${errorMessage(e)}`);
   }
 }
 
@@ -83,7 +84,7 @@ export function mountWebhookRoute (ctx: Ctx, app: Application): void {
     record('cmc:webhook', '2xx', started, ctx);
     const messages = (req.body as { messages?: unknown })?.messages;
     const scopeKeys = Array.isArray(messages) ? messages.filter((m): m is string => typeof m === 'string') : [];
-    dispatch(ctx, userKey, 'webhook', scopeKeys).catch(e => ctx.logger.warn(`cmc dispatch ${userKey}: ${errorMessage(e)}`));
+    dispatch(ctx, userKey, 'webhook', scopeKeys).catch(e => ctx.logger.warn(`cmc dispatch ${logKey(userKey)}: ${errorMessage(e)}`));
   });
 }
 
@@ -113,7 +114,7 @@ export async function dispatch (ctx: Ctx, userKey: string, reason: ChangeContext
         await saveEntry(entry);
       } catch (e) {
         status = '5xx';
-        ctx.logger.warn(`cmc dispatch ${userKey}: onChange failed: ${errorMessage(e)}`);
+        ctx.logger.warn(`cmc dispatch ${logKey(userKey)}: onChange failed: ${errorMessage(e)}`);
       }
       if (await cacheGet(againKey(userKey)) == null) break;
       current = { reason: 'again' };
@@ -151,7 +152,7 @@ export async function reconcileOne (ctx: Ctx, userKey: string): Promise<void> {
           e.record.acceptHookDone = true;
           dirty = true;
         } catch (err) {
-          ctx.logger.warn(`cmc reconcile ${userKey}: onAccepted failed again: ${errorMessage(err)}`);
+          ctx.logger.warn(`cmc reconcile ${logKey(userKey)}: onAccepted failed again: ${errorMessage(err)}`);
         }
       } else if (!e.record.acceptHookDone) {
         e.record.acceptHookDone = true;

@@ -9,6 +9,7 @@ import {
   type Ctx, type Entry
 } from './context.ts';
 import type { PendingScopeRequest, ScopeOptions, ScopePermission } from './types.ts';
+import { logKey } from './logKey.ts';
 
 /**
  * `want` strictly contains `held`: read < contribute < manage and create-only < contribute <
@@ -72,10 +73,10 @@ async function propose (ctx: Ctx, userKey: string, opts: ScopeOptions, build: Bu
   const started = ctx.now();
   const res = await withLease(ctx, userKey, async () => {
     const entry = await getEntry(userKey);
-    if (entry == null) throw new CmcRelationshipError('unknown-relationship', `no CMC relationship for ${userKey}`);
+    if (entry == null) throw new CmcRelationshipError('unknown-relationship', `no CMC relationship for ${logKey(userKey)}`);
     if (openRequest(ctx, entry) != null && opts.supersede !== true) {
       recordError('cmc_scope_request_open');
-      throw new CmcRelationshipError('scope-request-open', `a scope request of ${userKey} is pending`);
+      throw new CmcRelationshipError('scope-request-open', `a scope request of ${logKey(userKey)} is pending`);
     }
     const b = await build(entry);
     assertWebhooksAllowed(ctx, b.permissions);
@@ -93,7 +94,7 @@ async function propose (ctx: Ctx, userKey: string, opts: ScopeOptions, build: Bu
     await saveEntry(entry);
     return pending;
   }, ctx.o.leaseTtlMs);
-  if (res.busy) throw new CmcRelationshipError('relationship-busy', `relationship ${userKey} is busy`);
+  if (res.busy) throw new CmcRelationshipError('relationship-busy', `relationship ${logKey(userKey)} is busy`);
   record('cmc:scope-request', '2xx', started, ctx);
   return res.value;
 }
@@ -129,7 +130,7 @@ export async function widen (ctx: Ctx, userKey: string, add: ScopePermission[], 
   return await propose(ctx, userKey, opts, async (entry) => {
     // From access-info read just before sending, so nothing is dropped by omission.
     const ai = await readAccessInfo(ctx.connectionFor(entry.apiEndpoint));
-    if (ai.state !== 'live') throw new CmcRelationshipError(`grant-${ai.state}`, `the grant of ${userKey} is ${ai.state}`);
+    if (ai.state !== 'live') throw new CmcRelationshipError(`grant-${ai.state}`, `the grant of ${logKey(userKey)} is ${ai.state}`);
     const permissions = unionPermissions(ai.info.permissions ?? [], add);
     return { kind: 'plain', permissions, send: plainSender(ctx, entry, permissions, opts) };
   });
@@ -169,7 +170,7 @@ export async function scopeTick (ctx: Ctx): Promise<void> {
     try {
       await checkAnswer(ctx, entry);
     } catch (e) {
-      ctx.logger.warn(`cmc scope ${entry.userKey}: answer check failed: ${errorMessage(e)}`);
+      ctx.logger.warn(`cmc scope ${logKey(entry.userKey)}: answer check failed: ${errorMessage(e)}`);
     }
   }
 }
@@ -205,6 +206,6 @@ async function checkAnswer (ctx: Ctx, seen: Entry): Promise<void> {
       answer, scopeRequestEventId: pending.scopeRequestEventId, permissions: entry.record.grantedPermissions
     });
   } catch (e) {
-    ctx.logger.warn(`cmc scope ${entry.userKey}: onScopeAnswer failed for ${pending.scopeRequestEventId}: ${errorMessage(e)}`);
+    ctx.logger.warn(`cmc scope ${logKey(entry.userKey)}: onScopeAnswer failed for ${pending.scopeRequestEventId}: ${errorMessage(e)}`);
   }
 }

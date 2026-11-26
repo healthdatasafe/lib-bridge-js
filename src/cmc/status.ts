@@ -11,6 +11,7 @@ import { cmc } from 'hds-lib';
 import { recordConnectorOutcome, isConnectorStatusAccessError, type ConnectorOutcome } from '../lib/connectorStatus.ts';
 import { errorMessage, type Ctx, type Entry } from './context.ts';
 import type { SystemAlert } from './types.ts';
+import { logKey } from './logKey.ts';
 
 export const STATUS_WRITE_TIMEOUT_MS = 5_000;
 
@@ -21,16 +22,16 @@ async function write (ctx: Ctx, entry: Entry, leaf: string, outcome: ConnectorOu
   try {
     const res = await recordConnectorOutcome(ctx.connectionFor(entry.apiEndpoint), leaf, outcome, Math.floor(ctx.now() / 1000));
     warnedNoLeaf.delete(entry.userKey);
-    ctx.logger.debug(`cmc status ${entry.userKey}: ${res.action} (${res.content.status})`);
+    ctx.logger.debug(`cmc status ${logKey(entry.userKey)}: ${res.action} (${res.content.status})`);
   } catch (e) {
     if (isConnectorStatusAccessError(e)) {
       if (!warnedNoLeaf.has(entry.userKey)) {
         warnedNoLeaf.add(entry.userKey);
-        ctx.logger.warn(`cmc status ${entry.userKey}: grant cannot write ${leaf} (${(e as { id?: string }).id}); not published until it can`);
+        ctx.logger.warn(`cmc status ${logKey(entry.userKey)}: grant cannot write ${leaf} (${(e as { id?: string }).id}); not published until it can`);
       }
       return;
     }
-    ctx.logger.warn(`cmc status ${entry.userKey}: publishing failed: ${errorMessage(e)}`);
+    ctx.logger.warn(`cmc status ${logKey(entry.userKey)}: publishing failed: ${errorMessage(e)}`);
   }
 }
 
@@ -42,7 +43,7 @@ async function bounded (ctx: Ctx, entry: Entry, leaf: string, outcome: Connector
   });
   try {
     const r = await Promise.race([write(ctx, entry, leaf, outcome).then(() => 'done' as const), timeout]);
-    if (r === 'timeout') ctx.logger.warn(`cmc status ${entry.userKey}: write timed out after ${timeoutMs} ms (${outcome.kind}), abandoned`);
+    if (r === 'timeout') ctx.logger.warn(`cmc status ${logKey(entry.userKey)}: write timed out after ${timeoutMs} ms (${outcome.kind}), abandoned`);
   } finally {
     if (timer != null) clearTimeout(timer);
   }

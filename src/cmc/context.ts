@@ -13,6 +13,7 @@ import { cacheLock, cacheRenew, cacheUnlock, cacheDel } from '../lib/cache.ts';
 import { bridgeTelemetry, type CmcMethodId, type CmcErrorCode } from '../lib/observability.ts';
 import { isSchedulerWorker } from '../lib/schedulerRole.ts';
 import type { CmcConnection, CmcHooks, CmcRelationship, CmcRelationshipRecord, CmcRelationshipsOptions } from './types.ts';
+import { logKey } from './logKey.ts';
 
 const { getConfig, getLogger } = boiler;
 
@@ -219,7 +220,7 @@ export async function withLease<T> (
   const held = token;
   const renew = setInterval(() => {
     cacheRenew(key, held, ttl).then(ok => {
-      if (!ok) ctx.logger.warn(`cmc: lease of ${userKey} lost while held`);
+      if (!ok) ctx.logger.warn(`cmc: lease of ${logKey(userKey)} lost while held`);
     }).catch(() => {});
   }, Math.max(1000, Math.floor(ttl / 3)));
   renew.unref();

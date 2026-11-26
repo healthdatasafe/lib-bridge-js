@@ -18,6 +18,7 @@ import { publishStatus, sendAlert, settleStatusWrites } from './status.ts';
 import { createInvite, checkScope, newScopeState } from './invite.ts';
 import { bindConversation } from './conversation.ts';
 import type { CmcRelationship, CmcRelationships, CmcRelationshipsOptions, CmcRelationshipRecord } from './types.ts';
+import { logKey } from './logKey.ts';
 
 const { getConfig } = boiler;
 
@@ -83,7 +84,7 @@ export function createCmcRelationships (options: CmcRelationshipsOptions): CmcRe
     const entries = await listEntries(ctx);
     const step = entries.length > 0 ? ctx.o.reconcileMs / entries.length : 0;
     entries.forEach((e, i) => later(Math.floor(i * step), () => {
-      reconcileOne(ctx, e.userKey).catch(err => ctx.logger.warn(`cmc reconcile ${e.userKey}: ${errorMessage(err)}`));
+      reconcileOne(ctx, e.userKey).catch(err => ctx.logger.warn(`cmc reconcile ${logKey(e.userKey)}: ${errorMessage(err)}`));
     }));
   };
 

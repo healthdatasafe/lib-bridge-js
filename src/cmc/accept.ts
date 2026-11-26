@@ -19,6 +19,7 @@ import { createWebhook } from './webhook.ts';
 import { dataPermissions } from './scope.ts';
 import { publishStatus, sendAlert } from './status.ts';
 import type { CmcRelationshipRecord } from './types.ts';
+import { logKey } from './logKey.ts';
 
 export type RefusalReason = 'host' | 'unknown_invite' | 'wrong_person' | 'key';
 export type ArrivalOutcome = 'done' | 'skip' | 'retry' | { refused: RefusalReason };
@@ -133,7 +134,7 @@ async function store (ctx: Ctx, userKey: string, event: any, v: Verified): Promi
       if (t === 'hook-failed') return 'retry';
       existing = null;
     } else {
-      ctx.logger.warn(`cmc accept ${userKey}: relationship ${v.relationshipId} replaces live ${existing.record.relationshipId}`);
+      ctx.logger.warn(`cmc accept ${logKey(userKey)}: relationship ${v.relationshipId} replaces live ${existing.record.relationshipId}`);
     }
   }
   const replaced = existing != null;
@@ -162,7 +163,7 @@ async function store (ctx: Ctx, userKey: string, event: any, v: Verified): Promi
   };
   const entry: Entry = { userKey, apiEndpoint: v.apiEndpoint, record: rec };
   await saveEntry(entry);
-  ctx.logger.info(`cmc accept ${userKey}: relationship ${rec.relationshipId} stored (arrival ${rec.generation}${replaced ? ', replaces the previous grant' : ''})`);
+  ctx.logger.info(`cmc accept ${logKey(userKey)}: relationship ${rec.relationshipId} stored (arrival ${rec.generation}${replaced ? ', replaces the previous grant' : ''})`);
 
   // connected at the arrival's time: a replay cannot revive a disconnected status
   await publishStatus(ctx, entry, { kind: 'connected', at: acceptedAt });
@@ -175,7 +176,7 @@ async function store (ctx: Ctx, userKey: string, event: any, v: Verified): Promi
       entry.record.acceptHookDone = true;
       await saveEntry(entry);
     } catch (e) {
-      ctx.logger.warn(`cmc accept ${userKey}: onAccepted failed, reconciliation retries: ${errorMessage(e)}`);
+      ctx.logger.warn(`cmc accept ${logKey(userKey)}: onAccepted failed, reconciliation retries: ${errorMessage(e)}`);
     }
   }
   return 'done';
