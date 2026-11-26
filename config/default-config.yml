@@ -23,6 +23,10 @@ start:
   # Default false: the master keeps self-healing (bounded backoff + noticeError).
   # Opt in per bridge (e.g. bridge-mira) for hard-fail monitoring.
   exitOnCrashLoop: false
+  # On SIGTERM / SIGINT the master forwards the signal and waits this long for its workers to exit before killing
+  # them (a worker that handles the signal can finish the job it runs). Keep it below the orchestrator's stop timeout
+  # (Docker: 10 s by default). Also the code default, since a bridge's own default-config.yml replaces this file.
+  shutdownTimeoutMs: 8000
 
 # Logging
 logs:

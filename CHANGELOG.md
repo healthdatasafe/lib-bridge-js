@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.19.0] - 2026-11-26
+
+### Changed
+
+- **On SIGTERM / SIGINT the cluster master waits for its workers before exiting** (`src/lib/stopWorkers.ts`). It
+  forwards the signal as before, then waits up to `start:shutdownTimeoutMs` (default 8000, also the code default) for
+  every worker to exit and SIGKILLs those still running. It used to exit at once, and as the container's PID 1 it took
+  every worker down with it, whatever the orchestrator's stop timeout. A worker that does nothing on the signal still
+  exits at once; one that handles it (stops taking jobs, finishes the one running, then exits) now gets the time. Keep
+  the timeout below the orchestrator's stop timeout (Docker: 10 s by default). Tests `[STW1-3]`, and a real-cluster
+  smoke (graceful worker done at 600 ms, stuck one killed at the 1.5 s bound).
+
 ## [0.18.2] - 2026-11-26
 
 ### Fixed
