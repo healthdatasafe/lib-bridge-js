@@ -6,6 +6,7 @@ import type PluginBridge from './lib/PluginBridge.ts';
 import { initCacheMaster } from './lib/cache.ts';
 import { createCrashLoopMonitor, type CrashLoopIncident } from './lib/crashLoopMonitor.ts';
 import { createSchedulerRole } from './lib/schedulerRole.ts';
+import { DEFAULT_SHUTDOWN_TIMEOUT_MS, stopWorkers } from './lib/stopWorkers.ts';
 
 // New Relic APM agent removed (plan 88): no vendor SDK runs in the process.
 // Crash-loops are now detected by the host collector's container-uptime metric
@@ -84,13 +85,17 @@ export default async function startCluster (plugin?: PluginBridge, configDir?: s
     // Graceful termination on an intentional stop/restart. Registering a handler
     // overrides Node's default terminate, so we must actually tear down and exit:
     // stop reforking (cancels any pending backoff/escalation timer), forward the
-    // signal to workers, then exit cleanly. `once` so a repeated signal can't re-enter.
+    // signal to workers, wait for them to exit (bounded, stopWorkers.ts), then exit
+    // cleanly. `once` so a repeated signal can't re-enter.
+    const shutdownTimeoutMs = config.get<number>('start:shutdownTimeoutMs') ?? DEFAULT_SHUTDOWN_TIMEOUT_MS;
     const onSignal = (signal: NodeJS.Signals): void => {
-      const workers = cluster.workers ?? {};
-      logger.info(`Master ${process.pid} received ${signal}; stopping ${Object.keys(workers).length} worker(s) and exiting`);
+      const workers = Object.values(cluster.workers ?? {}).filter(w => w != null);
+      logger.info(`Master ${process.pid} received ${signal}; stopping ${workers.length} worker(s), waiting up to ${shutdownTimeoutMs} ms`);
       monitor.shutdown();
-      for (const worker of Object.values(workers)) worker?.process.kill(signal);
-      process.exit(0);
+      stopWorkers(workers, signal, shutdownTimeoutMs).then(({ killed }) => {
+        if (killed > 0) logger.warn(`Master ${process.pid}: ${killed} worker(s) still running after ${shutdownTimeoutMs} ms, killed`);
+        process.exit(0);
+      }, () => process.exit(0));
     };
     process.once('SIGTERM', () => onSignal('SIGTERM'));
     process.once('SIGINT', () => onSignal('SIGINT'));
