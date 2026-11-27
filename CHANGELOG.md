@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.20.1] - 2026-11-27
+
+### Fixed
+
+- **The HDS model is loaded from `service:serviceInfoURL`** (B-2026-11-27-14). `pryvService.init()` built its
+  `HDSService` from the configured URL, but hds-lib's `initHDSModel()` builds its own from hds-lib's default service
+  info URL (production, `https://reg.api.datasafe.dev/service/info`), so the model and converter packs came from
+  production whatever platform the bridge was configured for. `init()` now calls hds-lib's
+  `settings.setServiceInfoURL()` first. Test `[PSI1]` (runs `init()` in a child process with `fetch` stubbed).
+- The test helper (`lib-bridge-js/test`, `init()`) runs `pryvService.init()` before anything loads the model, instead
+  of calling `initHDSModel()` first.
+
+### For a consumer taking 0.20.1
+
+- A bridge that calls `initHDSModel()` itself before `createBridgeApp()` / `initPryvService()` still loads it from
+  the default URL: call `initPryvService()` first. A bridge with its own direct hds-lib copy has its own settings
+  singleton and is not covered by this fix.
+
 ## [0.20.0] - 2026-11-27
 
 ### Added

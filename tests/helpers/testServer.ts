@@ -6,7 +6,7 @@ import { listenLocal } from './localServer.ts';
 import ShortUniqueId from 'short-unique-id';
 import { getApp } from '../../src/server.ts';
 import * as pryvService from '../../src/lib/pryvService.ts';
-import { pryv, initHDSModel } from 'hds-lib';
+import { pryv } from 'hds-lib';
 import * as user from '../../src/methods/user.ts';
 import { requiredPermissionsAndStreams } from '../../src/lib/plugins.ts';
 import type { Application } from 'express';
@@ -26,7 +26,7 @@ let config: Config | null = null;
 async function init (plugin?: PluginBridge, configDir?: string): Promise<void> {
   initCacheLocal();
   const { getConfig } = initBoiler(`bridge:${process.pid}`, configDir);
-  await initHDSModel();
+  await pryvService.init(); // sets hds-lib's service info URL, then loads the model from it
   config = await getConfig();
   app = await getApp(plugin || new SampleBridge());
   appServer = await listenLocal(app);
