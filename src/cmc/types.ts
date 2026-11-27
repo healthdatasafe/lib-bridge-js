@@ -168,6 +168,18 @@ export interface CreateInviteParams {
   formSpec?: FormSpec;
   expiresInSeconds?: number;
   features?: { chat?: boolean; systemMessaging?: boolean };
+  /**
+   * Type of the access minted on accept (`@pryv/cmc`). Default `'shared'`; `'app'` lets the bridge create sub-accesses
+   * from it, as a CMC group's member accesses need.
+   */
+  accessType?: 'shared' | 'app';
+  /**
+   * Also offer two new document share children (hds-lib `cmcDocuments.newUploaderOffer`): `shared` at `read`, then
+   * `received` at `contribute`, added after the requested permissions. The bridge can then send documents and correct
+   * or remove them until she files or locks them. A group needs both ids in its original offer (a member access is
+   * bounded by it); new ids on every call. Her app creates and marks the two streams after accepting.
+   */
+  uploader?: boolean;
 }
 
 export interface CreateInviteResult {
@@ -175,6 +187,8 @@ export interface CreateInviteResult {
   capabilityUrl: string;
   patientUrl: string;
   expiresAt: number | null;
+  /** With `uploader: true`: the two share child ids the invite offers. */
+  uploader?: { received: string; shared: string };
 }
 
 export interface CmcRelationships {

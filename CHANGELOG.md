@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.20.0] - 2026-11-27
+
+### Added
+
+- **`createInvite({ accessType })`**: `'shared'` or `'app'`, passed to the invite request (`@pryv/cmc`). `'app'` makes
+  the access minted on accept delegable, as a CMC group's member accesses need. Not given: the core's default
+  (`'shared'`), as before. Test `[CMIT]`.
+- **`createInvite({ uploader: true })`** (plan 144): the requested permissions are followed by hds-lib's
+  `cmcDocuments.newUploaderOffer()` permissions, the `shared` share child at `read` then the `received` one at
+  `contribute` (read first: hds-lib up to 2.64.0 takes the first share id it reads as the `shared` child), and the
+  result carries `uploader: { received, shared }`. New ids on every call. Test `[CMIU]`.
+
+### Changed
+
+- **hds-lib 2.59.0 → 2.81.0** (pryv 3.20.0, `@pryv/cmc` 3.24.0 through it). No change in this library's API.
+
 ## [0.19.1] - 2026-11-27
 
 ### Changed

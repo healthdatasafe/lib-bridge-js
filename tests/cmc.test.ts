@@ -186,6 +186,41 @@ describe('[CMC] CMC relationship module', function () {
     assert.ok(bridge.streams.has(SCOPE), 'bare scope created when missing');
   });
 
+  it('[CMIT] createInvite: accessType is passed to the invite request, absent when not given', async () => {
+    const app = await cmcRel.createInvite({ accessType: 'app' });
+    assert.equal(bridge.events.find(e => e.id === app.inviteEventId)!.content.request.accessType, 'app');
+    const shared = await cmcRel.createInvite({ accessType: 'shared' });
+    assert.equal(bridge.events.find(e => e.id === shared.inviteEventId)!.content.request.accessType, 'shared');
+    const plain = await cmcRel.createInvite({});
+    assert.equal(bridge.events.find(e => e.id === plain.inviteEventId)!.content.request.accessType, undefined);
+    assert.equal(plain.uploader, undefined);
+  });
+
+  it('[CMIU] createInvite uploader: the requested permissions, then the shared child at read, then the received one at contribute; new ids each call', async () => {
+    const r = await cmcRel.createInvite({ uploader: true, accessType: 'app' });
+    const request = bridge.events.find(e => e.id === r.inviteEventId)!.content.request;
+    assert.ok(r.uploader != null);
+    const { shared, received } = r.uploader;
+    assert.match(shared, /^share-[a-z0-9]{12}$/);
+    assert.match(received, /^share-[a-z0-9]{12}$/);
+    assert.notEqual(shared, received);
+    assert.deepEqual(request.permissions, [
+      { streamId: 'hds-reader-inbox', level: 'read' },
+      { streamId: shared, level: 'read' },
+      { streamId: received, level: 'contribute' }
+    ]);
+    assert.equal(request.accessType, 'app');
+    const again = await cmcRel.createInvite({ uploader: true, requestedPermissions: [{ streamId: 'a', level: 'read' }] });
+    assert.ok(again.uploader != null);
+    const ids = new Set([shared, received, again.uploader.shared, again.uploader.received]);
+    assert.equal(ids.size, 4, 'fresh ids per call');
+    assert.deepEqual(bridge.events.find(e => e.id === again.inviteEventId)!.content.request.permissions.map((p: any) => p.streamId),
+      ['a', again.uploader.shared, again.uploader.received]);
+    const off = await cmcRel.createInvite({ uploader: false });
+    assert.equal(off.uploader, undefined);
+    assert.deepEqual(bridge.events.find(e => e.id === off.inviteEventId)!.content.request.permissions, [{ streamId: 'hds-reader-inbox', level: 'read' }]);
+  });
+
   // ---- accept: verification and refusal ---- //
 
   it('[CMAA] a verified accept stores credential + record, status, onAccepted; identity from access-info', async () => {

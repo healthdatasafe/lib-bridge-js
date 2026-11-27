@@ -217,6 +217,18 @@ the relationship (`record`, `connection()` over the data grant, `scope.widen / r
 verified username and host): the credential event of `{main}-users-{userKey}` with the record as
 `clientData.hdsCmc`.
 
+`createInvite` also takes `requestedPermissions` (default `hooks.requestedPermissions()`), `consent`, `formSpec`,
+`expiresInSeconds`, `features`, and:
+
+- `accessType: 'shared' | 'app'`: the type of the access minted on accept (default `'shared'`). `'app'` lets the
+  bridge create sub-accesses from it, as a CMC group's member accesses need.
+- `uploader: true`: the invite also offers two new document share children (hds-lib `cmcDocuments.newUploaderOffer`),
+  `shared` at `read` then `received` at `contribute`, after the requested permissions, and the result carries
+  `uploader: { received, shared }`. The bridge writes documents on `received` and can correct or remove them until the
+  person files or locks them; after that it reads them through `shared`. A group must offer both ids in its original
+  invite (a member access is bounded by it). The ids are new on every call; the person's app creates and marks the two
+  streams after accepting.
+
 - **`onChange` must be short and idempotent**: enqueue and return. It runs under the relationship's lease, may be
   coalesced and called again (`reason: 'again'`), and long work belongs to the plugin's own queue.
 - `onAccepted` that throws is retried by reconciliation; `onRevoked` that throws keeps the record live and is

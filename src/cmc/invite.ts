@@ -3,7 +3,7 @@
  * ensured (and probed for `health()`), the invite minted single-use with explicit features, and
  * the patient URL built on `service:patientAppBaseUrl`.
  */
-import { cmc, cmcFormSpec } from 'hds-lib';
+import { cmc, cmcDocuments, cmcFormSpec } from 'hds-lib';
 import { errorMessage, nowS, CmcRelationshipError, type Ctx } from './context.ts';
 import { assertWebhooksAllowed } from './scope.ts';
 import { EXPECTED_USERNAME_KEY } from './accept.ts';
@@ -74,10 +74,13 @@ export function patientUrlFor (ctx: Ctx, capabilityUrl: string): string {
 
 export async function createInvite (ctx: Ctx, s: ScopeState, p: CreateInviteParams): Promise<CreateInviteResult> {
   const scopeStreamId = await ensureScope(ctx, s);
-  const requestedPermissions = p.requestedPermissions ?? ctx.hooks.requestedPermissions?.();
-  if (requestedPermissions == null || requestedPermissions.length === 0) {
+  const asked = p.requestedPermissions ?? ctx.hooks.requestedPermissions?.();
+  if (asked == null || asked.length === 0) {
     throw new CmcRelationshipError('no-permissions', 'createInvite: no requestedPermissions (param or hooks.requestedPermissions)');
   }
+  // read before contribute: hds-lib up to 2.64.0 takes the first share id it reads as the `shared` child
+  const offer = p.uploader === true ? cmcDocuments.newUploaderOffer() : null;
+  const requestedPermissions = offer != null ? [...asked, ...offer.permissions] : asked;
   assertWebhooksAllowed(ctx, requestedPermissions);
   const expected = p.expectedUsername ?? null;
   const params = {
@@ -94,7 +97,8 @@ export async function createInvite (ctx: Ctx, s: ScopeState, p: CreateInvitePara
     // explicit: @pryv/cmc defaults both to true, and a chat nobody reads must not be offered
     features: p.features ?? ctx.o.invite.features,
     expiresAt: Math.floor(nowS(ctx)) + (p.expiresInSeconds ?? ctx.o.invite.expiresInSeconds),
-    ...(p.consent != null ? { consent: p.consent } : {})
+    ...(p.consent != null ? { consent: p.consent } : {}),
+    ...(p.accessType != null ? { accessType: p.accessType } : {})
   };
   const result = p.formSpec != null
     ? await cmcFormSpec.createInviteWithFormSpec(ctx.bridge() as any, { ...params, formSpec: p.formSpec } as any)
@@ -103,6 +107,7 @@ export async function createInvite (ctx: Ctx, s: ScopeState, p: CreateInvitePara
     inviteEventId: result.inviteEventId,
     capabilityUrl: result.capabilityUrl,
     patientUrl: patientUrlFor(ctx, result.capabilityUrl),
-    expiresAt: result.expiresAt ?? null
+    expiresAt: result.expiresAt ?? null,
+    ...(offer != null ? { uploader: { received: offer.received, shared: offer.shared } } : {})
   };
 }
