@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.20.2] - 2026-11-27
+
+### Added
+
+- **`pryvService.init()` logs where the service info and the HDS model came from**, one info line at startup:
+  `Service info <serviceInfoURL>, model <pack URL> (<model version>)`. The pack URL and version are read from the model
+  hds-lib actually loaded, not re-derived. A local log line, not telemetry; it names no apiEndpoint or token. Test
+  `[PSI1]` asserts it.
+
 ## [0.20.1] - 2026-11-27
 
 ### Fixed
