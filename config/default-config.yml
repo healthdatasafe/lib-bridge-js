@@ -46,31 +46,6 @@ storage:
   files:
     directory: ./storage
 
-# CMC relationship module (createCmcRelationships, plan 129). The same values are the code
-# defaults (a bridge's own default-config.yml replaces this file); options passed to
-# createCmcRelationships override them. Also reads service:apiEndpointHostPattern (null rejects
-# every accept), service:patientAppBaseUrl and service:serviceInfoURL.
-cmc:
-  # true creates the {main}-cmc stream (inbox cursor) and is required by start()
-  enabled: false
-  appCode: hds-bridge-reader
-  invite:
-    expiresInSeconds: 604800
-    features: { chat: false, systemMessaging: true }
-    # how the bridge is named to the person on its invites ("Invitation from ..."); null: the app code.
-    # Never the invited person's username: the binding to her is requesterMeta.hdsExpectedUsername
-    displayName: null
-  inbox:
-    intervalS: 30
-    lagS: 120
-    # Pryv seconds: where a first run starts reading the inbox (set by a migration)
-    initialCursor: null
-  scope:
-    pollIntervalS: 60
-  reconcile:
-    intervalS: 900
-  leaseTtlMs: 60000
-  webhooks:
-    # needs a public publicBaseUrl: the core refuses private hosts (local dev runs poll-only)
-    enabled: false
-    publicBaseUrl: null
+# CMC relationship module (createCmcRelationships): no `cmc:` block here on purpose. A bridge's
+# own default-config.yml replaces this file, so its keys would never reach a bridge; the defaults
+# live in code (src/cmc/context.ts). Keys, defaults and where they are set: README § "CMC configuration".

@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.20.3] - 2026-11-27
+
+### Changed
+
+- **The `cmc:` block is gone from the lib's `config/default-config.yml`; the README documents the real defaults.**
+  `initBoiler()` loads either the bridge's `config/` or the lib's, never both, so a bridge's own `default-config.yml`
+  replaces the lib's file and the block never reached a bridge (`cmc:invite:displayName` read `undefined` on
+  bridge-mira). The values in use were always the code defaults of `src/cmc/context.ts`, which equal the removed
+  file values key for key (`enabled`, `appCode`, `invite.expiresInSeconds`, `invite.features`, `invite.displayName`,
+  `inbox.intervalS`, `inbox.lagS`, `inbox.initialCursor`, `scope.pollIntervalS`, `reconcile.intervalS`, `leaseTtlMs`,
+  `webhooks.enabled`, `webhooks.publicBaseUrl`). No behaviour change, for bridges or for the lib's own tests. New
+  README section "CMC configuration": key, option, default and where each is set.
+
 ## [0.20.2] - 2026-11-27
 
 ### Added
