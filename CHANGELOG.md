@@ -9,12 +9,30 @@
   (`'shared'`), as before. Test `[CMIT]`.
 - **`createInvite({ uploader: true })`** (plan 144): the requested permissions are followed by hds-lib's
   `cmcDocuments.newUploaderOffer()` permissions, the `shared` share child at `read` then the `received` one at
-  `contribute` (read first: hds-lib up to 2.64.0 takes the first share id it reads as the `shared` child), and the
-  result carries `uploader: { received, shared }`. New ids on every call. Test `[CMIU]`.
+  `contribute` (read first: hds-lib before 2.65.0 takes the first share id it reads as the `shared` child), and the
+  result carries `uploader: { received, shared }`. New ids on every call. The requested permissions must name no
+  `share-…` id and not `document-shares` (`CmcRelationshipError` `uploader-share-named`). `uploader` does not set
+  `accessType`: a group also passes `accessType: 'app'`. Tests `[CMIU]`, `[CMIV]` (the `formSpec` path), `[CMIS]`.
 
 ### Changed
 
+- **`scope.replace` and `scope.requestDataSet` keep the `share-…` children granted now** (`keepShareStreams`), unless
+  the new set names them: a scope update replaces the whole grant, so an uploader lost its `received` and `shared`
+  children. Both now read access-info before sending, as `widen` does, and refuse a grant that is not live
+  (`grant-gone`, `grant-unknown`) without sending. Test `[CMPS]`.
 - **hds-lib 2.59.0 → 2.81.0** (pryv 3.20.0, `@pryv/cmc` 3.24.0 through it). No change in this library's API.
+
+### For a consumer taking 0.20.0
+
+- **Re-pin a direct hds-lib dependency to 2.81.0 in the same change**, else the bridge loads two hds-lib copies, each
+  with its own model singleton (`initHDSModel` loads one, the other stays empty): bridge-mira pins 2.57.0,
+  datasets-service 2.54.2, hds-support-service 2.51.2. A direct `pryv` pin is a second pryv copy: bridge-athenahealth
+  pins 3.18.0 (hds-lib brings 3.20.0).
+- hds-lib behaviour changes since 2.59.0 a bridge can see: 2.64.0 regional locales (`fr-CH` reads `fr`; an invite or
+  alert sends `pt-BR` as `pt`); 2.65.0 `shareStreamsOf` (a share child at `contribute` is the received one) and
+  `cleanupDocumentShares` (keeps where a document is filed and the other contacts' share ids); 2.77.0 the
+  cervical-fluid converter reads `pack-v2.json`; 2.79.0 `researchInvitePermissions` also asks `:system:email`; 2.81.0
+  `shareDocument` throws `open-document` or `not-received`.
 
 ## [0.19.1] - 2026-11-27
 

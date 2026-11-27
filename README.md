@@ -227,7 +227,13 @@ verified username and host): the credential event of `{main}-users-{userKey}` wi
   `uploader: { received, shared }`. The bridge writes documents on `received` and can correct or remove them until the
   person files or locks them; after that it reads them through `shared`. A group must offer both ids in its original
   invite (a member access is bounded by it). The ids are new on every call; the person's app creates and marks the two
-  streams after accepting.
+  streams after accepting. The requested permissions must then name no `share-…` id and not `document-shares`
+  (`uploader-share-named`). `uploader` does not set `accessType`: a group also passes `accessType: 'app'`; a bridge
+  that uploads itself may stay `'shared'`. Later, recover the ids from the relationship with
+  `cmcDocuments.shareStreamsOf(rel.record.grantedPermissions)`.
+
+`scope.replace` and `scope.requestDataSet` keep the `share-…` children granted now (read from access-info just before
+sending) unless the new set names them: a scope update replaces the whole grant, and an uploader would lose them.
 
 - **`onChange` must be short and idempotent**: enqueue and return. It runs under the relationship's lease, may be
   coalesced and called again (`reason: 'again'`), and long work belongs to the plugin's own queue.

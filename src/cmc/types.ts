@@ -60,9 +60,9 @@ export interface CmcRelationship {
   scope: {
     /** Full set = granted ∪ add (read from access-info just before sending). */
     widen (add: ScopePermission[], opts?: ScopeOptions): Promise<PendingScopeRequest>;
-    /** An explicit full set (may narrow). */
+    /** An explicit full set (may narrow); the `share-…` children granted now are kept unless it names them. */
     replace (full: ScopePermission[], opts?: ScopeOptions): Promise<PendingScopeRequest>;
-    /** A data-set update (`cmcScope.proposeDataSetUpdate`). */
+    /** A data-set update (`cmcScope.proposeDataSetUpdate`); the `share-…` children granted now are kept. */
     requestDataSet (formSpec: FormSpec, opts?: ScopeOptions): Promise<PendingScopeRequest>;
     /** The open request, or null (none, or expired). */
     pending (): PendingScopeRequest | null;
@@ -175,9 +175,11 @@ export interface CreateInviteParams {
   accessType?: 'shared' | 'app';
   /**
    * Also offer two new document share children (hds-lib `cmcDocuments.newUploaderOffer`): `shared` at `read`, then
-   * `received` at `contribute`, added after the requested permissions. The bridge can then send documents and correct
-   * or remove them until she files or locks them. A group needs both ids in its original offer (a member access is
-   * bounded by it); new ids on every call. Her app creates and marks the two streams after accepting.
+   * `received` at `contribute`, added after the requested permissions, which must name no `share-…` id and not
+   * `document-shares` (`uploader-share-named`). The bridge can then send documents and correct or remove them until
+   * she files or locks them. A group needs both ids in its original offer (a member access is bounded by it); new ids
+   * on every call. Her app creates and marks the two streams after accepting. It does not set `accessType`: a group
+   * also passes `accessType: 'app'`; a bridge that uploads itself may stay `'shared'`.
    */
   uploader?: boolean;
 }
@@ -187,7 +189,10 @@ export interface CreateInviteResult {
   capabilityUrl: string;
   patientUrl: string;
   expiresAt: number | null;
-  /** With `uploader: true`: the two share child ids the invite offers. */
+  /**
+   * With `uploader: true`: the two share child ids the invite offers. The bridge writes documents on `received` and
+   * reads them through `shared` once frozen. Later, from a relationship: `cmcDocuments.shareStreamsOf(rel.record.grantedPermissions)`.
+   */
   uploader?: { received: string; shared: string };
 }
 

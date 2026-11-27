@@ -78,7 +78,10 @@ export async function createInvite (ctx: Ctx, s: ScopeState, p: CreateInvitePara
   if (asked == null || asked.length === 0) {
     throw new CmcRelationshipError('no-permissions', 'createInvite: no requestedPermissions (param or hooks.requestedPermissions)');
   }
-  // read before contribute: hds-lib up to 2.64.0 takes the first share id it reads as the `shared` child
+  if (p.uploader === true && cmcDocuments.namesShareStreams(asked)) {
+    throw new CmcRelationshipError('uploader-share-named', 'createInvite: with uploader, the requested permissions must not name a share-… id or document-shares');
+  }
+  // read before contribute: hds-lib before 2.65.0 takes the first share id it reads as the `shared` child
   const offer = p.uploader === true ? cmcDocuments.newUploaderOffer() : null;
   const requestedPermissions = offer != null ? [...asked, ...offer.permissions] : asked;
   assertWebhooksAllowed(ctx, requestedPermissions);

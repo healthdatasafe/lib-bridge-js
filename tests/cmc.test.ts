@@ -8,7 +8,7 @@ import { getCredentialEvent } from '../src/methods/user.ts';
 import { cacheDel, cacheLock, cacheUnlock } from '../src/lib/cache.ts';
 import { setTelemetryHolderForTests, CMC_METHOD_IDS, CMC_ERROR_CODES } from '../src/lib/observability.ts';
 import { createCmcRelationships, _testInternals } from '../src/cmc/index.ts';
-import { unionPermissions, levelContains, dataPermissions } from '../src/cmc/scope.ts';
+import { unionPermissions, levelContains, dataPermissions, keepShareStreams } from '../src/cmc/scope.ts';
 import { withLease } from '../src/cmc/context.ts';
 import { teardownLocked } from '../src/cmc/revoke.ts';
 import type { CmcHooks, CmcRelationships, CmcRelationshipsOptions } from '../src/cmc/types.ts';
@@ -216,9 +216,46 @@ describe('[CMC] CMC relationship module', function () {
     assert.equal(ids.size, 4, 'fresh ids per call');
     assert.deepEqual(bridge.events.find(e => e.id === again.inviteEventId)!.content.request.permissions.map((p: any) => p.streamId),
       ['a', again.uploader.shared, again.uploader.received]);
+    // a group passes accessType itself: uploader alone leaves it to the core's default
+    const alone = await cmcRel.createInvite({ uploader: true });
+    assert.equal(bridge.events.find(e => e.id === alone.inviteEventId)!.content.request.accessType, undefined);
     const off = await cmcRel.createInvite({ uploader: false });
     assert.equal(off.uploader, undefined);
     assert.deepEqual(bridge.events.find(e => e.id === off.inviteEventId)!.content.request.permissions, [{ streamId: 'hds-reader-inbox', level: 'read' }]);
+  });
+
+  it('[CMIV] createInvite with a formSpec: accessType app and uploader reach the request, the form spec is snapshotted', async () => {
+    const formSpec = {
+      version: 1,
+      title: { en: 'Load' },
+      description: { en: 'desc' },
+      consent: { en: 'I consent' },
+      permissions: [{ streamId: 'health', level: 'read' }],
+      sections: [{ key: 'sleep-section', type: 'recurring', name: { en: 'Sleep' }, itemKeys: ['sleep-duration'] }]
+    } as any;
+    const r = await cmcRel.createInvite({ formSpec, requestedPermissions: [{ streamId: 'health', level: 'read' }], accessType: 'app', uploader: true });
+    const trigger = bridge.events.find(e => e.id === r.inviteEventId)!;
+    assert.equal(trigger.type, 'consent/request-cmc');
+    assert.ok(r.uploader != null);
+    assert.equal(trigger.content.request.accessType, 'app');
+    assert.deepEqual(trigger.content.request.permissions, [
+      { streamId: 'health', level: 'read' },
+      { streamId: r.uploader.shared, level: 'read' },
+      { streamId: r.uploader.received, level: 'contribute' }
+    ]);
+    assert.equal(trigger.content.hdsFormSpec.title.en, 'Load');
+    assert.ok(r.patientUrl.includes('capabilityUrl='));
+  });
+
+  it('[CMIS] createInvite uploader refuses requested permissions that already name a share child or document-shares', async () => {
+    for (const streamId of ['share-abcdefghijkl', ':local:share-abcdefghijkl', 'document-shares']) {
+      await assert.rejects(() => cmcRel.createInvite({ uploader: true, requestedPermissions: [{ streamId: 'a', level: 'read' }, { streamId, level: 'read' }] }),
+        (e: any) => e.id === 'uploader-share-named', streamId);
+    }
+    assert.equal(bridge.ofType('consent/request-cmc').length, 0, 'nothing written');
+    // without uploader the caller's own set is sent as it is
+    await cmcRel.createInvite({ requestedPermissions: [{ streamId: 'share-abcdefghijkl', level: 'read' }] });
+    assert.equal(bridge.ofType('consent/request-cmc').length, 1);
   });
 
   // ---- accept: verification and refusal ---- //
@@ -637,6 +674,39 @@ describe('[CMC] CMC relationship module', function () {
     bridge.scopeRequest = 'failed';
     await assert.rejects(() => rel.scope.widen([{ streamId: 'more', level: 'read' }]));
     assert.equal((await cmcRel.get(KEY('alice')))!.record.pendingScopeRequest, null);
+  });
+
+  it('[CMPS] replace and requestDataSet keep the share children granted now, unless the new set names them; a gone grant sends nothing', async () => {
+    const shared = 'share-aaaaaaaaaaaa';
+    const received = 'share-bbbbbbbbbbbb';
+    assert.deepEqual(keepShareStreams(
+      [{ streamId: 'inbox', level: 'read' }, { streamId: shared, level: 'read' }, { streamId: ':local:' + received, level: 'contribute' }, { streamId: ':_audit:access-a1', level: 'read' }],
+      [{ streamId: 'x', level: 'read' }, { streamId: shared, level: 'read' }]
+    ), [{ streamId: 'x', level: 'read' }, { streamId: shared, level: 'read' }, { streamId: received, level: 'contribute' }], 'canonical ids, as personPermissions reads them');
+
+    const a = await connect('alice');
+    await t.inboxTick();
+    a.grant.info.permissions.push({ streamId: shared, level: 'read' }, { streamId: received, level: 'contribute' });
+    const sent = () => bridge.ofType('consent/scope-request-cmc').at(-1)!.content.newPermissions;
+
+    await (await cmcRel.get(KEY('alice')))!.scope.replace([{ streamId: 'x', level: 'read' }]);
+    assert.deepEqual(sent(), [{ streamId: 'x', level: 'read' }, { streamId: shared, level: 'read' }, { streamId: received, level: 'contribute' }]);
+    assert.deepEqual((await cmcRel.get(KEY('alice')))!.record.pendingScopeRequest!.permissions, sent());
+
+    // a set naming a child keeps the caller's level for it
+    await (await cmcRel.get(KEY('alice')))!.scope.replace([{ streamId: 'x', level: 'read' }, { streamId: received, level: 'create-only' }], { supersede: true });
+    assert.deepEqual(sent(), [{ streamId: 'x', level: 'read' }, { streamId: received, level: 'create-only' }, { streamId: shared, level: 'read' }]);
+
+    const formSpec = { version: 1, title: { en: 'Set' }, description: { en: 'd' }, permissions: [{ streamId: 'health', level: 'read' }], sections: [] } as any;
+    await (await cmcRel.get(KEY('alice')))!.scope.requestDataSet(formSpec, { supersede: true });
+    assert.deepEqual(sent(), [{ streamId: 'health', level: 'read' }, { streamId: shared, level: 'read' }, { streamId: received, level: 'contribute' }]);
+    assert.equal((await cmcRel.get(KEY('alice')))!.record.pendingScopeRequest!.kind, 'dataset');
+
+    const before = bridge.ofType('consent/scope-request-cmc').length;
+    a.grant.state = 'gone';
+    await assert.rejects(() => cmcRel.get(KEY('alice')).then(r => r!.scope.replace([{ streamId: 'x', level: 'read' }], { supersede: true })),
+      (e: any) => e.id === 'grant-gone');
+    assert.equal(bridge.ofType('consent/scope-request-cmc').length, before, 'nothing sent');
   });
 
   // ---- loops ---- //
