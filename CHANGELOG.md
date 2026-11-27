@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.19.1] - 2026-11-27
+
+### Changed
+
+- **A CMC dispatch saves `lastDispatchAt` at most every 10 min** (`DISPATCH_SAVE_EVERY_S`, `src/cmc/webhook.ts`). The
+  save rewrites the relationship's credential event (`streams.create`, `events.get`, `events.update`); with a 15 s
+  reconcile it ran on every pass and was an idle bridge's only write (HDS Reader on demo: about one `events.update`
+  per relationship every 15 s, B-2026-11-24-14). An older saved value only moves `onChange`'s `modifiedSince`
+  earlier, so the read window is a superset. Test `[CMWF]`.
+
 ## [0.19.0] - 2026-11-26
 
 ### Changed

@@ -719,6 +719,22 @@ describe('[CMC] CMC relationship module', function () {
       assert.ok(telemetry.errors.includes('cmc_dispatch_coalesced'));
     });
 
+    it('[CMWF] lastDispatchAt is saved at most every DISPATCH_SAVE_EVERY_S; modifiedSince follows the saved value', async () => {
+      await connect('alice');
+      await t.inboxTick();
+      const ctx = await t.ctx();
+      const { dispatch, DISPATCH_SAVE_EVERY_S } = await import('../src/cmc/webhook.ts');
+      await dispatch(ctx, KEY('alice'), 'poll');
+      assert.equal((await cmcRel.get(KEY('alice')))!.record.lastDispatchAt, 10000, 'the first dispatch saves');
+      clock += 300_000;
+      await dispatch(ctx, KEY('alice'), 'poll');
+      assert.equal((await cmcRel.get(KEY('alice')))!.record.lastDispatchAt, 10000, 'not rewritten 300 s later');
+      clock += DISPATCH_SAVE_EVERY_S * 1000;
+      await dispatch(ctx, KEY('alice'), 'poll');
+      assert.equal((await cmcRel.get(KEY('alice')))!.record.lastDispatchAt, 10000 + 300 + DISPATCH_SAVE_EVERY_S, 'saved again after the interval');
+      assert.deepEqual(calls.change.map(c => c.modifiedSince), [null, 10000 - 60, 10000 - 60]);
+    });
+
     it('[CMWE] onAccepted failure is retried by reconciliation, not by re-processing the accept', async () => {
       let fail = true;
       hooks.onAccepted = async (rel, c) => {
