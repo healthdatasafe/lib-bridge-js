@@ -110,7 +110,9 @@ The bridge's only dependency is `lib-bridge-js` — all other packages (express,
 ### 4. Configuration
 
 Provide a `config/` directory with:
-- `default-config.yml` — framework defaults + bridge-specific defaults (service config, permissions, etc.)
+- `default-config.yml` — framework defaults + bridge-specific defaults (service config, permissions, etc.). It
+  replaces lib-bridge-js's own `config/default-config.yml` (the two are not merged); keys the bridge leaves out take
+  their code defaults.
 - `test-config.yml` — test overrides (unsafe token, localhost, disabled logs)
 - `localConfig.yml` — minimal, just deployment secrets (`bridgeApiEndPoint`)
 
@@ -185,8 +187,7 @@ the partner onboarding flow. Partner bridges are untouched.
 
 **Enable** with config `cmc:enabled: true` (creates the `{main}-cmc` stream that holds the inbox cursor; `start()`
 refuses without it). `service:apiEndpointHostPattern` must name the platform's domain (null refuses every accept) and
-`service:patientAppBaseUrl` the HDS app. Other keys and their defaults are in `config/default-config.yml` § `cmc:`
-(app code, invite expiry, features and `displayName`, inbox interval and lag, scope poll, reconciliation, lease TTL, webhooks).
+`service:patientAppBaseUrl` the HDS app. Other keys: see [CMC configuration](#cmc-configuration).
 
 **Start it from `PluginBridge.init`**, before the lib collects route patterns for telemetry (plugin init already runs
 first):
@@ -246,6 +247,31 @@ sending) unless the new set names them: a scope update replaces the whole grant,
 - **Never an apiEndpoint in logs or telemetry**: the module logs user keys and relationship ids only, records
   telemetry through the closed sets `CMC_METHOD_IDS` / `CMC_ERROR_CODES`, and `connection()` is the only way to the
   grant. Keep it so in hooks.
+
+### CMC configuration
+
+The defaults are set in code, not in the lib's `config/default-config.yml`: a bridge's own `default-config.yml`
+replaces the lib's file (they are not merged), so a `cmc:` block there would never reach a bridge. Each value comes
+from the option passed to `createCmcRelationships`, else the bridge's config key, else the default below. All are
+resolved in `createContext()` (`src/cmc/context.ts`, the `DEFAULTS` constant) except `cmc:enabled`.
+
+| Config key | Option | Default | Meaning |
+|---|---|---|---|
+| `cmc:enabled` | — | `false` (read as `=== true` in `src/cmc/index.ts` and `src/lib/bridgeAccount.ts`) | creates the `{main}-cmc` stream (inbox cursor); `start()` refuses without it |
+| `cmc:appCode` | `appCode` | `hds-bridge-reader` | app scope `:_cmc:apps:<appCode>` |
+| `cmc:invite:expiresInSeconds` | `invite.expiresInSeconds` | `604800` (7 days) | invite lifetime |
+| `cmc:invite:features` | `invite.features` | `{ chat: false, systemMessaging: true }` | features offered on the invite |
+| `cmc:invite:displayName` | `invite.displayName` | the app code (null or empty falls back to it) | how the bridge is named to the person on its invites; never the person's username |
+| `cmc:inbox:intervalS` | `inbox.intervalS` | `30` | inbox poll interval |
+| `cmc:inbox:lagS` | `inbox.lagS` | `120` | how far behind now the inbox reads |
+| `cmc:inbox:initialCursor` | `inbox.initialCursor` | `null` | Pryv seconds where a first run starts reading the inbox (set by a migration) |
+| `cmc:scope:pollIntervalS` | `scope.pollIntervalS` | `60` | scope-answer poll interval |
+| `cmc:reconcile:intervalS` | `reconcile.intervalS` | `900` | reconciliation interval |
+| `cmc:leaseTtlMs` | `leaseTtlMs` | `60000` | relationship lease TTL |
+| `cmc:webhooks:enabled` | `webhooks.enabled` | `false` | webhooks on (needs a public `publicBaseUrl`) |
+| `cmc:webhooks:publicBaseUrl` | `webhooks.publicBaseUrl` | `null` | public base URL of the bridge for webhooks |
+| `service:apiEndpointHostPattern` | `apiEndpointHostPattern` | `null` (refuses every accept) | allowed host of an accepted apiEndpoint, anchored at the end |
+| `service:patientAppBaseUrl` | `patientAppBaseUrl` | `null` | HDS app base for `patientUrl` |
 
 ### The standard conversation (`rel.conversation`)
 
