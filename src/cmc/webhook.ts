@@ -88,6 +88,9 @@ export function mountWebhookRoute (ctx: Ctx, app: Application): void {
   });
 }
 
+/** `lastDispatchAt` is saved at most this often (seconds). */
+export const DISPATCH_SAVE_EVERY_S = 600;
+
 /**
  * Call `onChange` under the lease. Busy: leave the `again` flag and return; the holder runs once
  * more when it sees it. `modifiedSince` = the previous dispatch minus 60 s.
@@ -109,9 +112,13 @@ export async function dispatch (ctx: Ctx, userKey: string, reason: ChangeContext
       if (current.scopeKeys != null) c.scopeKeys = current.scopeKeys;
       try {
         await onChange(ctx.rel(entry), c);
-        // on the record, under the lease: the module never writes the plugin's state event
-        entry.record.lastDispatchAt = at;
-        await saveEntry(entry);
+        // on the record, under the lease: the module never writes the plugin's state event. At most every
+        // DISPATCH_SAVE_EVERY_S: a save rewrites the credential event, and with a 15 s reconcile that was an idle
+        // bridge's only write (B-2026-11-24-14). An older value only moves `modifiedSince` earlier: a wider read.
+        if (typeof last !== 'number' || at - last >= DISPATCH_SAVE_EVERY_S) {
+          entry.record.lastDispatchAt = at;
+          await saveEntry(entry);
+        }
       } catch (e) {
         status = '5xx';
         ctx.logger.warn(`cmc dispatch ${logKey(userKey)}: onChange failed: ${errorMessage(e)}`);
