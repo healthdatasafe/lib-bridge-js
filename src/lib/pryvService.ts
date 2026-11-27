@@ -1,5 +1,5 @@
 import boiler from 'dev-boiler';
-import { HDSService, initHDSModel } from 'hds-lib';
+import { HDSService, initHDSModel, settings as hdsSettings } from 'hds-lib';
 import ShortUniqueId from 'short-unique-id';
 import { internalError } from '../errors/index.ts';
 
@@ -29,6 +29,8 @@ async function init (): Promise<unknown> {
   if (infosSingleton) return infosSingleton;
   config = (await getConfig()).get('service');
   if (!config.appId) throw new Error('Cannot find appId in config');
+  // initHDSModel() builds its own HDSService from hds-lib's default URL (B-2026-11-27-14).
+  hdsSettings.setServiceInfoURL(config.serviceInfoURL);
   try {
     // A transient failure here used to kill every worker at boot (B-2026-10-02-3).
     infosSingleton = await withRetry(async () => {
