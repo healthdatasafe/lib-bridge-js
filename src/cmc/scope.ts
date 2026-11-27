@@ -2,7 +2,7 @@
  * Scope updates (DESIGN.md §5.4). Both platform calls replace the grant's permission set, so
  * the module always sends the FULL set; it holds the single open request of a relationship.
  */
-import { cmc, cmcScope, cmcFormSpec, type FormSpec } from 'hds-lib';
+import { cmc, cmcDocuments, cmcScope, cmcFormSpec, type FormSpec } from 'hds-lib';
 import { readAccessInfo } from '../lib/grantState.ts';
 import {
   CmcRelationshipError, getEntry, saveEntry, listEntries, withLease, nowS, record, recordError, errorMessage,
@@ -52,6 +52,28 @@ export function unionPermissions (current: ScopePermission[], add: ScopePermissi
     out[i] = { streamId: a.streamId, level: want };
   }
   return out;
+}
+
+/**
+ * `next` plus the document share children (`share-…`) granted in `current` that `next` does not name, at their granted
+ * level. A scope update replaces the whole grant, so a set built without them (a `replace`, a data set) would take an
+ * uploader's `received` and `shared` children away: it could no longer send, correct or read what it sent.
+ */
+export function keepShareStreams (current: ScopePermission[], next: ScopePermission[]): ScopePermission[] {
+  const named = new Set(next.filter(p => p.streamId != null).map(p => cmcDocuments.canonicalStreamId(p.streamId!)));
+  const kept = dataPermissions(current).filter(p => {
+    if (p.streamId == null) return false;
+    const id = cmcDocuments.canonicalStreamId(p.streamId);
+    return cmcDocuments.isShareStreamId(id) && !named.has(id);
+  });
+  return [...next, ...kept];
+}
+
+/** The grant's permissions read just before sending; refused when it is not live. */
+async function livePermissions (ctx: Ctx, entry: Entry): Promise<ScopePermission[]> {
+  const ai = await readAccessInfo(ctx.connectionFor(entry.apiEndpoint));
+  if (ai.state !== 'live') throw new CmcRelationshipError(`grant-${ai.state}`, `the grant of ${logKey(entry.userKey)} is ${ai.state}`);
+  return ai.info.permissions ?? [];
 }
 
 /** A set disabling webhooks would silently turn §5.5 off: refused while webhooks are on. */
@@ -129,23 +151,24 @@ function plainSender (ctx: Ctx, entry: Entry, permissions: ScopePermission[], op
 export async function widen (ctx: Ctx, userKey: string, add: ScopePermission[], opts: ScopeOptions = {}): Promise<PendingScopeRequest> {
   return await propose(ctx, userKey, opts, async (entry) => {
     // From access-info read just before sending, so nothing is dropped by omission.
-    const ai = await readAccessInfo(ctx.connectionFor(entry.apiEndpoint));
-    if (ai.state !== 'live') throw new CmcRelationshipError(`grant-${ai.state}`, `the grant of ${logKey(userKey)} is ${ai.state}`);
-    const permissions = unionPermissions(ai.info.permissions ?? [], add);
+    const permissions = unionPermissions(await livePermissions(ctx, entry), add);
     return { kind: 'plain', permissions, send: plainSender(ctx, entry, permissions, opts) };
   });
 }
 
+/** `full` is the whole new set, but the share children granted now are kept (`keepShareStreams`). */
 export async function replace (ctx: Ctx, userKey: string, full: ScopePermission[], opts: ScopeOptions = {}): Promise<PendingScopeRequest> {
   return await propose(ctx, userKey, opts, async (entry) => {
-    const permissions = dataPermissions(full);
+    const permissions = keepShareStreams(await livePermissions(ctx, entry), dataPermissions(full));
     return { kind: 'plain', permissions, send: plainSender(ctx, entry, permissions, opts) };
   });
 }
 
+/** The data set's permissions, plus the share children granted now (`keepShareStreams`). */
 export async function requestDataSet (ctx: Ctx, userKey: string, formSpec: FormSpec, opts: ScopeOptions = {}): Promise<PendingScopeRequest> {
   return await propose(ctx, userKey, opts, async (entry) => {
-    const permissions = cmcFormSpec.deriveCmcPermissions(cmcFormSpec.formSpecForPerson(formSpec)) as ScopePermission[];
+    const derived = cmcFormSpec.deriveCmcPermissions(cmcFormSpec.formSpecForPerson(formSpec)) as ScopePermission[];
+    const permissions = keepShareStreams(await livePermissions(ctx, entry), derived);
     return {
       kind: 'dataset',
       permissions,
