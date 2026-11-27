@@ -16,11 +16,16 @@ describe('[PSIX] pryvService.init loads the HDS model from service:serviceInfoUR
 
   it('[PSI1] fetches only the configured service info and loads the model from its hds-model asset', async () => {
     const configured = 'https://configured.datasafe.test/reg/service/info';
-    const { stdout } = await run(process.execPath, [probe, configured], { env: { ...process.env, NODE_ENV: 'test' } });
+    const { stdout } = await run(process.execPath, [probe, configured], { env: { ...process.env, NODE_ENV: 'test', LOGS: 'info' } });
     const line = stdout.split('\n').find((l) => l.startsWith('PROBE:'));
     assert.ok(line, 'probe printed no result:\n' + stdout);
     const { requested, modelUrl } = JSON.parse(line.slice('PROBE:'.length));
     assert.equal(modelUrl, 'https://configured.datasafe.test/model/pack.json');
     assert.deepEqual(requested.filter((u: string) => u.endsWith('/service/info')).filter((u: string) => u !== configured), []);
+    // The startup log line names both, so a bridge's logs say which platform they came from.
+    assert.ok(
+      stdout.includes(`Service info ${configured}, model https://configured.datasafe.test/model/pack.json (9.9.9-probe)`),
+      'no startup log line naming the service info and model URLs:\n' + stdout
+    );
   });
 });

@@ -24,7 +24,7 @@ globalThis.fetch = async (input: any): Promise<Response> => {
       assets: { 'hds-model': origin + '/model/pack.json' }
     });
   }
-  if (url.endsWith('/model/pack.json')) return Response.json({ items: {} });
+  if (url.endsWith('/model/pack.json')) return Response.json({ version: '9.9.9-probe', items: {} });
   return new Response('not stubbed', { status: 404 });
 };
 

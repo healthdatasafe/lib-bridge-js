@@ -36,7 +36,9 @@ async function init (): Promise<unknown> {
     infosSingleton = await withRetry(async () => {
       serviceSingleton = new HDSService(config.serviceInfoURL);
       const infos = await serviceSingleton.info();
-      await initHDSModel();
+      const model = await initHDSModel();
+      // Local log only (not telemetry): says which platform the service info and the model came from.
+      logger().info(`Service info ${config.serviceInfoURL}, model ${model.modelUrl} (${model.modelData?.version ?? 'unknown version'})`);
       return infos;
     }, BOOT_FETCH_RETRY, (err, attempt, delayMs) => {
       logger().warn(`Service info / HDS model fetch failed (attempt ${attempt}), retrying in ${delayMs}ms: ${err.message}`);
